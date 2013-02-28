@@ -1,4 +1,4 @@
 dstream
 =======
 
-A D-Stream in Python
+A D-Stream implementation in Python
