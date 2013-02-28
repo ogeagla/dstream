@@ -4,14 +4,16 @@ import numpy as np
 class DStreamCharacteristicVector():
     
     def __init__(self, 
-                 last_update_time, 
-                 last_sporadic_removal_time, 
-                 density, 
-                 label, 
-                 status):
+                 density=0.0, 
+                 label='NO_CLASS', 
+                 status='NORMAL',
+                 last_update_time=-1, 
+                 last_sporadic_removal_time=-1, 
+                 last_marked_sporadic_time=-1):
         
         self.last_update_time = last_update_time
         self.last_sporadic_removal_time = last_sporadic_removal_time
+        self.last_marked_sporadic_time = last_marked_sporadic_time
         self.density = density
         self.label = label
         self.status = status
@@ -55,25 +57,74 @@ class DStreamClusterer():
         
         self.maximum_grid_count = N
         self.grids = {}
+        self.removed_grid_cache = {}
+        self.clusters = np.array([], dtype=type(DStreamCluster))
         
         self.gap_time = -1.0
         self.compute_gap_time()
-        self.has_clustered_once = False
+        self.current_time = 0
         
-    def add_datum(self):
-        pass
+        
+    def add_datum(self, datum):
+        
+        indices = self.get_grid_indices(datum)
+        
+        if self.grids.has_key(indices):
+            grid = self.grids[indices]
+        else:
+            if self.removed_grid_cache.has_key(indices):
+                grid = self.removed_grid_cache[indices]
+            else:
+                grid = DStreamCharacteristicVector()
+                
+        grid.density = 1.0 + grid.density*self.decay_factor**(self.current_time - grid.last_update_time)
+        grid.last_update_time = self.current_time
+        self.grids[indices] = grid
+            
+        if self.current_time == self.gap_time:
+            self.initialize_clusters()
+        if np.mod(self.current_time, self.gap_time) == 0:
+            sporadic_grids = self.get_sporadic_grids()
+            for indices, grid in sporadic_grids.items():
+                if grid.last_marked_sporadic_time != -1 and grid.last_marked_sporadic_time + 1 <=self.current_time:
+                    if grid.last_update_time != self.current_time:
+                        self.grids = {key: value for key, value in self.grids.items() if value is not grid}
+                        grid.last_sporadic_removal_time = self.current_time
+                        self.removed_grid_cache[indices ] = grid
+                    else:
+                        if self.is_sporadic(grid, self.current_time) == False:
+                            grid.status = 'NORMAL'
+                            self.grids[indices] = grid
+            self.detect_sporadic_grids(self.current_time)
+            self.cluster()
+            
+        self.current_time += 1
+        
         
     def initialize_clusters(self):
+        pass
 
-        #do stuff here        
-        
-        self.has_clustered_once = True
-    
     def cluster(self):
         pass
     
-    def detect_and_remove_sporadic_grids(self):
-        pass
+    def get_sporadic_grids(self):
+        sporadic_grids = {}#np.array([], type(DStreamCharacteristicVector))
+        for indices, grid in self.grids.items():
+            if grid.status == 'SPORADIC':
+                sporadic_grids[indices] = grid#np.append(sporadic_grids, d_stream_characteristic_vector)
+        return sporadic_grids
+    def is_sporadic(self, grid, current_time):
+        if grid.density < self.density_threshold_function(grid.last_update_time, current_time) and current_time >= (1.0 + self.sporadic_threshold_parameter)*grid.last_sporadic_removal_time:
+            return True
+        return False
+    def detect_sporadic_grids(self, current_time):
+        for indices, grid in self.grids.items():
+            if self.is_sporadic(grid, current_time):
+                #if d_stream_characteristic_vector.density < self.density_threshold_function(d_stream_characteristic_vector.last_update_time, current_time) and current_time >= (1.0 + self.sporadic_threshold_parameter)*d_stream_characteristic_vector.last_sporadic_removal_time:
+                print 'detected sporadic grid at indices: ', indices                
+                grid.status = 'SPORADIC'
+                grid.last_marked_sporadic_time = current_time
+                self.grids[indices] = grid
     
     def compute_gap_time(self):
         
@@ -104,7 +155,7 @@ class DStreamClusterer():
             indices = np.append(indices, index)
         return indices
     
-    def density_threshold_function(self, current_time, last_update_time):
+    def density_threshold_function(self, last_update_time, current_time):
         
         top = self.sparse_thresold_parameter * (1.0 - self.decay_factor ** (current_time - last_update_time + 1))
         bottom = self.maximum_grid_count * (1.0 - self.decay_factor)
@@ -125,7 +176,7 @@ if __name__ == "__main__":
     print 'getting dth for t=4, t=0', d_stream_clusterer.density_threshold_function(4, 0)
     print 'getting dth for t=8, t=0', d_stream_clusterer.density_threshold_function(8, 0)    
     
-    d_stream_characteristic_vector = DStreamCharacteristicVector(0, 0, 0.0, 'NO_CLASS', 'NORMAL')
+    d_stream_characteristic_vector = DStreamCharacteristicVector ()
     print d_stream_characteristic_vector
     
     d_stream_cluster = DStreamCluster()
