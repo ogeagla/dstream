@@ -21,12 +21,23 @@ class DStreamCharacteristicVector():
 class DStreamCluster():
 
     def __init__(self, 
-                 characteristic_vectors = None):
+                 grids = None):
                      
-        self.characteristic_vectors = np.array([], dtype=type(DStreamCharacteristicVector))
+        self.grids = {}#np.array([], dtype=type(DStreamCharacteristicVector))
+        if grids != None:
+            self.addGrids(grids)
         
-        if characteristic_vectors != None:
-            self.characteristic_vectors = np.append(self.characteristic_vectors, characteristic_vectors)
+    def addGrids(self, grids):
+        
+        for indices, grid in grids.items():
+            self.grids[indices] = grid
+                
+    def removeGrids(self, grids):
+        
+        for indices, grid in grids.items():
+            if self.grids.has_key(indices):
+                self.grids =  {key: value for key, value in self.grids.items() if value is not grid}
+                
               
 class DStreamClusterer():  
     '''
