@@ -58,15 +58,16 @@ class DStreamClusterer():
         
         self.gap_time = -1.0
         self.compute_gap_time()
+        self.has_clustered_once = False
         
     def add_datum(self):
         pass
         
-    def initialize_grids(self):
-        pass
-        
     def initialize_clusters(self):
-        pass
+
+        #do stuff here        
+        
+        self.has_clustered_once = True
     
     def cluster(self):
         pass
@@ -85,10 +86,29 @@ class DStreamClusterer():
         print 'computed gap time: ', self.gap_time
         
     def get_grid_indices(self, datum):
-        pass
+        '''
+        dimensions = 2, 
+        domains_per_dimension = ((0.0, 100.0), (0.0, 100.0)),
+        partitions_per_dimension = (10, 10)
+        '''
+        indices = np.array([])
+        for i in range(self.dimensions):
+            
+            domain_tuple = self.domains_per_dimension[i]
+            partitions = self.partitions_per_dimension[i]
+            
+            index = np.floor([(datum[i]/domain_tuple[1])*(partitions)])[0]
+            if index == partitions:
+                print 'index equals partitions: ', index, partitions
+                index -= 1
+            indices = np.append(indices, index)
+        return indices
     
     def density_threshold_function(self, current_time, last_update_time):
-        pass
+        
+        top = self.sparse_thresold_parameter * (1.0 - self.decay_factor ** (current_time - last_update_time + 1))
+        bottom = self.maximum_grid_count * (1.0 - self.decay_factor)
+        return top/bottom
     
        
         
@@ -99,6 +119,11 @@ if __name__ == "__main__":
     
     d_stream_clusterer = DStreamClusterer()
     print d_stream_clusterer
+    print 'indices for inserting 35.0, 100.0: ', d_stream_clusterer.get_grid_indices((35.0, 100.0))
+    print 'indices for inserting 0.0, 60.0: ', d_stream_clusterer.get_grid_indices((0.0, 60.0))
+    print 'getting dth for t=2, t=0', d_stream_clusterer.density_threshold_function(2, 0)
+    print 'getting dth for t=4, t=0', d_stream_clusterer.density_threshold_function(4, 0)
+    print 'getting dth for t=8, t=0', d_stream_clusterer.density_threshold_function(8, 0)    
     
     d_stream_characteristic_vector = DStreamCharacteristicVector(0, 0, 0.0, 'NO_CLASS', 'NORMAL')
     print d_stream_characteristic_vector
