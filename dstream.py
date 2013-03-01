@@ -36,7 +36,7 @@ class DStreamCluster():
         
         for indices, grid in grids.items():
             if self.grids.has_key(indices):
-                self.grids =  {key: value for key, value in self.grids.items() if value is not grid}
+                self.grids =  {key: value for key, value in self.grids.items() if value is not grid} #this can be re-written
                 
               
 class DStreamClusterer():  
@@ -70,10 +70,12 @@ class DStreamClusterer():
         self.grids = {}
         self.removed_grid_cache = {}
         self.clusters = np.array([], dtype=type(DStreamCluster))
+        self.cluster_count = 4 #from ref        
         
         self.gap_time = -1.0
         self.compute_gap_time()
         self.current_time = 0
+        
         
         
     def add_datum(self, datum):
@@ -113,10 +115,65 @@ class DStreamClusterer():
         
         
     def initialize_clusters(self):
-        pass
+
+        self.update_density_category()
+        
+        cluster_counts = np.array([])
+        dense_grids, non_dense_grids = self.get_dense_grids()
+        
+        cluster_size = np.round(len(dense_grids.keys)/self.cluster_count)
+        print 'cluster size: ', cluster_size
+        for i in range(self.cluster_count):
+            if i == self.cluster_count - 1:
+                current_total = np.sum(cluster_counts)
+                last_count = len(dense_grids.keys) - current_total
+                cluster_counts = np.append(cluster_counts, last_count)
+                print 'last cluster size: ', last_count
+            else:
+                cluster_counts = np.append(cluster_counts, cluster_size)
+        counter = 0
+        for grid_count in cluster_counts: 
+            cluster_grids = {}
+            for i in range(grid_count):
+                k = dense_grids.keys()[counter]
+                v = dense_grids.values()[counter]
+                cluster_grids[k] = v
+                counter += 1
+            cluster = DStreamCluster(cluster_grids)
+            self.clusters = np.append(self.clusters, cluster)
+            #cluster = DStreamCluster(a;osirferj)
+        for indices, grid in non_dense_grids.items():
+            grid.label = 'NO_CLASS'
+            self.grids[indices] = grid
+        
+        #repeat section TODO
+        
 
     def cluster(self):
         pass
+    
+    def update_density_category(self):
+        for indices, grid in self.grids.items():
+            if grid.density >= self.dense_threshold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)):
+                grid.label = 'DENSE'
+                print 'grid with indices: ', indices, ' is DENSE'
+            if grid.density <= self.sparse_thresold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)):
+                grid.label = 'SPARSE'
+                print 'grid with indices: ', indices, ' is SPARSE'                
+            if grid.density >= self.sparse_thresold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)) and grid.density <= self.dense_threshold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)):
+                grid.label = 'TRANSITIONAL'
+                print 'grid with indices: ', indices, ' is TRANSITIONAL' 
+            self.grids[indices] = grid
+    def get_dense_grids(self):
+        dense_grids = {}
+        non_dense_grids = {}
+        for indices, grid in self.grids.items():
+            if grid.label == 'DENSE':
+                dense_grids[indices] = grid
+            else:
+                non_dense_grids[indices] = grid
+                
+        return dense_grids, non_dense_grids
     
     def get_sporadic_grids(self):
         sporadic_grids = {}#np.array([], type(DStreamCharacteristicVector))
