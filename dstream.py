@@ -93,10 +93,10 @@ class DStreamClusterer():
         return test_key
         
     def add_datum(self, datum):
-        print 'current time: ', self.current_time, ' and gap time: ', self.gap_time
-        print 'adding: ', datum
+        #print 'current time: ', self.current_time, ' and gap time: ', self.gap_time
+        #print 'adding: ', datum
         indices = tuple(self.get_grid_indices(datum))
-        print 'with indices: ', indices, tuple(indices)
+        #print 'with indices: ', indices, tuple(indices)
         if self.grids.has_key(indices):
             grid = self.grids[indices]
         else:
@@ -127,7 +127,7 @@ class DStreamClusterer():
             self.cluster()
             
         self.current_time += 1
-        print self.grids
+        print 'grids after adding: ', self.grids
 
     def initialize_clusters(self):
         self.has_clustered_once = True
@@ -205,16 +205,21 @@ class DStreamClusterer():
                 neighboring_clusters[neighbor_indices, neighbors_cluster_class] =  neighbors_cluster_grids
                 
             max_neighbor_cluster_size = 0
+            max_size_indices = None
             #max_size_cluster = None
             print 'neighboring clusters: ', neighboring_clusters.keys()
             for k, ref_neighbor_cluster_grids in neighboring_clusters.items():
                 test_size = len(ref_neighbor_cluster_grids.keys())
+                print 'size comparison: ', test_size, max_neighbor_cluster_size
                 if test_size > max_neighbor_cluster_size:
                     max_neighbor_cluster_size = test_size
                     #max_size_cluster = neighbor_cluster
                     max_size_cluster_key = k[1]
                     max_size_indices = k[0]
                     max_cluster_grids = ref_neighbor_cluster_grids
+            if max_size_indices == None:
+                print 'no neighbors, thus no biggest neighbors, skipping clustering this time***********'
+                return
             max_size_grid = neighboring_grids[max_size_indices]
             grids_cluster = self.get_grids_of_cluster_class(grid.label)                    
                                 
@@ -591,8 +596,8 @@ def cartesian(arrays, out=None):
 if __name__ == "__main__":
     
     d_stream_clusterer = DStreamClusterer()
-    for i in range(20):
-        d_stream_clusterer.add_datum((25.3, 13.1+np.mod(i, 3)))
+    for i in range(150):
+        d_stream_clusterer.add_datum((25.3, 13.1+np.mod(i, 60)))
     '''print d_stream_clusterer
     print 'indices for inserting 35.0, 100.0: ', d_stream_clusterer.get_grid_indices((35.0, 100.0))
     print 'indices for inserting 0.0, 60.0: ', d_stream_clusterer.get_grid_indices((0.0, 60.0))
