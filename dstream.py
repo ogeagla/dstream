@@ -8,9 +8,7 @@ import matplotlib.pyplot as plt
 
 
 '''
-
-it looks to me like the adjacency matrix traversal, neighbor finding, and connectedness checking should be done with:
-breadth first search, BFS tree
+there are many other places where I can/should substitute my algs with the new NetworkX version using graphs
 
 TODO:
     -iteration impl
@@ -76,6 +74,8 @@ class DStreamClusterer():
         
         self.gap_time = -1.0
         self.compute_gap_time()
+        self.has_clustered_once = False
+        
         self.current_time = 0
         #self.last_updated_grids = {}
         
@@ -93,9 +93,10 @@ class DStreamClusterer():
         return test_key
         
     def add_datum(self, datum):
-        
-        indices = self.get_grid_indices(datum)
-        
+        print 'current time: ', self.current_time, ' and gap time: ', self.gap_time
+        print 'adding: ', datum
+        indices = tuple(self.get_grid_indices(datum))
+        print 'with indices: ', indices, tuple(indices)
         if self.grids.has_key(indices):
             grid = self.grids[indices]
         else:
@@ -110,7 +111,7 @@ class DStreamClusterer():
             
         if self.current_time == self.gap_time:
             self.initialize_clusters()
-        if np.mod(self.current_time, self.gap_time) == 0:
+        if np.mod(self.current_time, self.gap_time) == 0 and self.has_clustered_once:
             sporadic_grids = self.get_sporadic_grids()
             for indices, grid in sporadic_grids.items():
                 if grid.last_marked_sporadic_time != -1 and grid.last_marked_sporadic_time + 1 <=self.current_time:
@@ -126,29 +127,34 @@ class DStreamClusterer():
             self.cluster()
             
         self.current_time += 1
+        print self.grids
 
     def initialize_clusters(self):
-
+        self.has_clustered_once = True
         self.update_density_category()
         
         cluster_counts = np.array([])
         dense_grids, non_dense_grids = self.get_dense_grids()
+        cluster_size = np.round(len(dense_grids.keys())/self.cluster_count)
+        print 'dense count: {} non-dense count: {} cluster count: {} cluster size: {}'.format(len(dense_grids.keys()), len(non_dense_grids.keys()), self.cluster_count, cluster_size)
         
-        cluster_size = np.round(len(dense_grids.keys)/self.cluster_count)
         print 'cluster size: ', cluster_size
         for i in range(self.cluster_count):
             if i == self.cluster_count - 1:
                 current_total = np.sum(cluster_counts)
-                last_count = len(dense_grids.keys) - current_total
-                cluster_counts = np.append(cluster_counts, last_count)
+                last_count = len(dense_grids.keys()) - current_total
+                cluster_counts = np.append(cluster_counts, np.int(last_count))
                 print 'last cluster size: ', last_count
             else:
-                cluster_counts = np.append(cluster_counts, cluster_size)
+                cluster_counts = np.append(cluster_counts, np.int(cluster_size))
         counter = 0
+        print cluster_counts
         for grid_count in cluster_counts: 
+            grid_count = np.int(grid_count)
             cluster_grids = {}
             unique_class_key = self.generate_unique_class_key()
             self.class_keys = np.append(self.class_keys, unique_class_key)
+            print grid_count
             for i in range(grid_count):
                 k = dense_grids.keys()[counter]
                 v = dense_grids.values()[counter]
@@ -200,6 +206,7 @@ class DStreamClusterer():
                 
             max_neighbor_cluster_size = 0
             #max_size_cluster = None
+            print 'neighboring clusters: ', neighboring_clusters.keys()
             for k, ref_neighbor_cluster_grids in neighboring_clusters.items():
                 test_size = len(ref_neighbor_cluster_grids.keys())
                 if test_size > max_neighbor_cluster_size:
@@ -292,31 +299,18 @@ class DStreamClusterer():
         grids_with_removal = {key: value for key, value in grids_without_removal if key is not removal_grid_indices}
         graph_with_removal = self.get_graph_of_cluster(grids_with_removal)
         return nx.is_connected(graph_with_removal)
-        '''for indices, grid in grids_with_removal.items():
-            for test_indices, test_grid in grids_with_removal.items():
-                path_exists = False
-                try:
-                    path_result = nx.bidirectional_dijkstra(G,indices,test_indices)
-                    path_exists = True
-                except nx.exception.NetworkXNoPath, e:
-                    path_exists = False
-                if path_exists == False:
-                    return False
-        return True'''
-        
-                    
 
     def get_graph_of_cluster(self, grids):
         indices_list = grids.keys()
-        G = nx.empty_graph()
+        g = nx.empty_graph()
         for i in range(len(indices_list)):
             indices = indices_list[i]
             for j in range(len(indices_list)):
                 other_indices = indices_list[j]
                 if self.are_neighbors(indices, other_indices):
-                    if G.has_edge(indices, other_indices) == False:
-                        G.add_edge(indices, other_indices)
-        return G
+                    if g.has_edge(indices, other_indices) == False:
+                        g.add_edge(indices, other_indices)
+        return g
         
     def are_neighbors(self, grid1_indices, grid2_indices):
         target_identical_count = self.dimensions - 1
@@ -327,13 +321,7 @@ class DStreamClusterer():
             elif np.abs(grid1_indices[i] - grid2_indices[i]) != 1:
                 return False
         return identical_count == target_identical_count
-
-
-
-        
-        
-        
-        
+  
     '''below are completed'''
     
     def validate_can_belong_to_cluster(self, cluster, test_grid):
@@ -399,27 +387,34 @@ class DStreamClusterer():
             
             if ref_index == 0: 
                 possibles = np.append(possibles, 1)
-            elif ref_index == self.domains_per_dimension[i] - 1:
+            elif ref_index == self.partitions_per_dimension[i] - 1:
                 possibles = np.append(possibles, ref_index - 1)
             else:
                 possibles = np.append(possibles, ref_index - 1)
                 possibles = np.append(possibles, ref_index + 1)
-            per_dimension_possible_indices = np.append(per_dimension_possible_indices, possibles)  
+            print 'possibles: ', possibles
+            if per_dimension_possible_indices.size == 0:
+                per_dimension_possible_indices = possibles
+            else:    
+                per_dimension_possible_indices = np.row_stack((per_dimension_possible_indices,possibles))#np.append(per_dimension_possible_indices, tuple(possibles))  
+            print 'pers: ', per_dimension_possible_indices
             total_possible_neighbors *= possibles.size                    
             
         
-        print 'possible indices: ', per_dimension_possible_indices
-        per_dimension_possible_indices_tuple = tuple(tuple(x) for x in per_dimension_possible_indices)
-        print 'possible indices as tuple: ', per_dimension_possible_indices_tuple        
-        cartesian_product_of_possible_indices = cartesian(per_dimension_possible_indices_tuple)
+        print 'possible indices: ', per_dimension_possible_indices        
+        cartesian_product_of_possible_indices = cartesian(per_dimension_possible_indices)
         print 'cartesian product of possible indices tuple: ', cartesian_product_of_possible_indices
         
         for indices in cartesian_product_of_possible_indices:
+            indices = tuple(indices)
+            print 'testing if in cluster: ', indices
             if cluster_grids != None:
+                print 'checking in cluster: ', cluster_grids.keys()
                 if cluster_grids.has_key(indices):
                     grid = cluster_grids[indices]
                     neighbors[indices] = grid
             else:
+                print 'checking in all grids: ', self.grids.keys()
                 if self.grids.has_key(indices):
                     grid = self.grids[indices]
                     neighbors[indices] = grid
@@ -596,7 +591,9 @@ def cartesian(arrays, out=None):
 if __name__ == "__main__":
     
     d_stream_clusterer = DStreamClusterer()
-    print d_stream_clusterer
+    for i in range(20):
+        d_stream_clusterer.add_datum((25.3, 13.1+np.mod(i, 3)))
+    '''print d_stream_clusterer
     print 'indices for inserting 35.0, 100.0: ', d_stream_clusterer.get_grid_indices((35.0, 100.0))
     print 'indices for inserting 0.0, 60.0: ', d_stream_clusterer.get_grid_indices((0.0, 60.0))
     print 'getting dth for t=0, t=4', d_stream_clusterer.density_threshold_function(0, 4)
@@ -632,4 +629,4 @@ if __name__ == "__main__":
     
     fig = plt.figure()
     nx.draw(G)
-    plt.show()
+    plt.show()'''
