@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
 import numpy as np
+import random
+'''
+
+it looks to me like the adjacency matrix traversal, neighbor finding, and connectedness checking should be done with:
+breadth first search, BFS tree
+
+
+'''
+
 
 class DStreamCharacteristicVector():
     
@@ -7,6 +16,7 @@ class DStreamCharacteristicVector():
                  density=0.0, 
                  label='NO_CLASS', 
                  status='NORMAL',
+                 density_category=None,
                  last_update_time=-1, 
                  last_sporadic_removal_time=-1, 
                  last_marked_sporadic_time=-1):
@@ -14,6 +24,7 @@ class DStreamCharacteristicVector():
         self.last_update_time = last_update_time
         self.last_sporadic_removal_time = last_sporadic_removal_time
         self.last_marked_sporadic_time = last_marked_sporadic_time
+        self.density_category = density_category
         self.density = density
         self.label = label
         self.status = status
@@ -25,14 +36,14 @@ class DStreamCluster():
                      
         self.grids = {}#np.array([], dtype=type(DStreamCharacteristicVector))
         if grids != None:
-            self.addGrids(grids)
+            self.add_grids(grids)
         
-    def addGrids(self, grids):
+    def add_grids(self, grids):
         
         for indices, grid in grids.items():
             self.grids[indices] = grid
                 
-    def removeGrids(self, grids):
+    def remove_grids(self, grids):
         
         for indices, grid in grids.items():
             if self.grids.has_key(indices):
@@ -77,6 +88,17 @@ class DStreamClusterer():
         self.current_time = 0
         self.last_updated_grids = {}
         
+        seed = 331
+        self.seed = seed        
+        self.class_keys = np.array([])
+        random.seed(self.seed)
+        
+    def generate_unique_class_key(self):
+        test_key = np.int(np.round(random.uniform(0, 1), 8)*10**8)
+        while test_key in self.class_keys:
+            print 'class key test collision...weird'
+            test_key = np.int(np.round(random.uniform(0, 1), 8)*10**8)
+        return test_key
         
     def add_datum(self, datum):
         
@@ -133,9 +155,11 @@ class DStreamClusterer():
         counter = 0
         for grid_count in cluster_counts: 
             cluster_grids = {}
+            unique_class_key = self.generate_unique_class_key()
             for i in range(grid_count):
                 k = dense_grids.keys()[counter]
                 v = dense_grids.values()[counter]
+                v.label = unique_class_key
                 cluster_grids[k] = v
                 counter += 1
             cluster = DStreamCluster(cluster_grids)
@@ -183,11 +207,57 @@ class DStreamClusterer():
         self.update_density_category()
         for indices, grid in self.last_updated_grids.items():
             if grid.label == 'SPARSE':
-                pass
+                grids_cluster = self.get_cluster_of_grid(indices, grid)
+                self.remove_cluster(grids_cluster)
+    
+                would_still_be_connected = self.cluster_still_connected_upon_removal(grids_cluster, indices, grid)                
+                
+                grids_cluster.remove_grids({indices:grid})
+                self.add_cluster(grids_cluster)
+                grid.label = 'NO_CLASS'
+                self.grids[indices] = grid
+                
+                if would_still_be_connected == False:
+                    self.extract_two_clusters_from(grids_cluster)
+            elif grid.label == 'DENSE':
+                neighboring_grids = self.get_neighboring_grids(indices)
+                neighboring_clusters = {}
+                for neighbor_indices, neighbor_grid in neighboring_grids.item():
+                    neighbors_cluster = self.get_cluster_of_grid(neighbor_indices, neighbor_grid)
+                    neighboring_clusters[neighbor_indices] = neighbors_cluster
+                max_neighbor_cluster_size = 0
+                max_size_cluster = None
+                for neighbor_grid_key, neighbor_cluster in neighboring_clusters.items():
+                #for i in range(neighboring_clusters.size):
+                    #neighbor_cluster = neighboring_clusters[i]
+                    size = len(neighbor_cluster.grids.keys())
+                    if size > max_neighbor_cluster_size:
+                        max_neighbor_cluster_size = size
+                        max_size_cluster = neighbor_cluster
+                        max_size_indices = neighbor_grid_key
+                max_size_grid = neighboring_grids[max_size_indices]
+                if max_size_grid.label == 'DENSE':
+                    pass
+                
+                
+                
+                    
     
 
 
+    '''
+    TODO
+    '''
+    def extract_two_clusters_from(self, broken_cluster):
+        #first remove it, then split into two, then add the two
+        pass
 
+    '''
+    TODO
+    '''
+    def cluster_still_connected_upon_removal(self, cluster, removal_indices, removal_grid):
+        pass
+        #this one might be fun
 
     '''
     Both of these
@@ -206,7 +276,7 @@ class DStreamClusterer():
     def belongs_to_cluster(self, cluster, indices, grid):
         pass
     '''
-    this will return inside, outside tuple dicts
+    this will return inside, outside grids
     TODO
     '''
     def get_cluster_inside_grids(self, cluster):
@@ -216,10 +286,10 @@ class DStreamClusterer():
             pass
         return inside_grids, outside_grids
     '''
-    this will return array of indices (index tuples)
+    this will return dict of neighboring grids; if cluster is specified, will return neighbors within that cluster
     TODO
     '''    
-    def get_neighboring_grids(self, cluster, ref_indices):
+    def get_neighboring_grids(self, ref_indices, cluster=None):
         neighbors = {}
         for indices, grid in cluster.grids.items():
             pass
