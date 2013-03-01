@@ -1,17 +1,11 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import random
+
 '''
 
 it looks to me like the adjacency matrix traversal, neighbor finding, and connectedness checking should be done with:
 breadth first search, BFS tree
-
-
-'''
-'''
-todo 
-- replace last_updated_grids with a bool in the grid char vector
-- remove all 'clusters' data type/structure
 
 '''
 
@@ -36,29 +30,7 @@ class DStreamCharacteristicVector():
         self.status = status
         self.category_changed_last_time = category_changed_last_time
         
-'''class DStreamCluster():
 
-    def __init__(self, 
-                 grids = None,
-                 class_key = None):
-                     
-        self.grids = {}#np.array([], dtype=type(DStreamCharacteristicVector))
-        self.class_key = class_key
-        if grids != None:
-            self.add_grids(grids)
-        
-    def add_grids(self, grids):
-        
-        for indices, grid in grids.items():
-            self.grids[indices] = grid
-                
-    def remove_grids(self, grids):
-        
-        for indices, grid in grids.items():
-            if self.grids.has_key(indices):
-                self.grids =  {key: value for key, value in self.grids.items() if value is not grid} #this can be re-written
-'''              
-              
 class DStreamClusterer():  
     '''
     Initialize with defaults from reference algorithm
@@ -192,7 +164,7 @@ class DStreamClusterer():
             
         
             
-            inside_grids, outside_grids = self.get_cluster_grids(cluster_grids)
+            inside_grids, outside_grids = self.get_inside_grids(cluster_grids)
             for indices, grid in outside_grids.items():
                 neighboring_grids = self.get_neighboring_grids(indices)
                 for neighbor_indices, neighbor_grid in neighboring_grids.items():
@@ -222,18 +194,7 @@ class DStreamClusterer():
                         
 
                 
-    def assign_to_cluster_class(self, grids, class_key):
-        for indices, grid in grids.items():
-            grid.label = class_key
-            self.grids[indices] = grid
-            
-    def get_grids_of_cluster_class(self, class_key):
-        grids = {}
-        for indices, grid in self.grids.items():
-            if grid.label == class_key:
-                grids[indices] = grid
-                
-        return grids
+
         
     def cluster(self):
         self.update_density_category()
@@ -242,7 +203,7 @@ class DStreamClusterer():
                                 
             neighboring_grids = self.get_neighboring_grids(indices)
             neighboring_clusters = {}
-            for neighbor_indices, neighbor_grid in neighboring_grids.item():
+            for neighbor_indices, neighbor_grid in neighboring_grids.items():
                 neighbors_cluster_class = neighbor_grid.label
                 neighbors_cluster_grids = self.get_grids_of_cluster_class(neighbors_cluster_class)
                 neighboring_clusters[neighbor_indices, neighbors_cluster_class] =  neighbors_cluster_grids
@@ -306,13 +267,7 @@ class DStreamClusterer():
                 grid.label = max_outside_cluster_class
                 self.grids[indices] = grid
            
-                    
-    def get_most_recently_categorically_changed_grids(self):
-        return_grids = {}
-        for indices, grid in self.grids.items():
-            if grid.category_changed_last_time == True:
-                return_grids[indices] = grid
-        return return_grids
+
 
     '''TODO'''       
     def grid_is_outside_if_added_to_cluster(self, test_grid, grids):
@@ -375,18 +330,26 @@ class DStreamClusterer():
             pass
         return neighbors
         
+    def assign_to_cluster_class(self, grids, class_key):
+        for indices, grid in grids.items():
+            grid.label = class_key
+            self.grids[indices] = grid
+            
+    def get_grids_of_cluster_class(self, class_key):
+        grids = {}
+        for indices, grid in self.grids.items():
+            if grid.label == class_key:
+                grids[indices] = grid
+                
+        return grids                
+    def get_most_recently_categorically_changed_grids(self):
+        return_grids = {}
+        for indices, grid in self.grids.items():
+            if grid.category_changed_last_time == True:
+                return_grids[indices] = grid
+        return return_grids        
         
-        
-        
-        
-        
-    '''def get_cluster_of_grid(self, indices, grid):
-        
-        for i in range(self.clusters.size):
-            if self.clusters[i].grids.has_key(indices):
-                return self.cluster[i]
-        print 'warning - no cluster found with this grid key: ', indices
-        return None ''' 
+    
     def update_density_category(self):
         #self.last_updated_grids = {}
         for indices, grid in self.grids.items():
