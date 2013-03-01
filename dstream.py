@@ -172,7 +172,7 @@ class DStreamClusterer():
                         test_class_key = self.class_keys[j]
                         test_cluster_grids = self.get_grids_of_cluster_class(test_class_key)
                         
-                        neighbor_belongs_to_test_cluster = self.validate_belongs_to_cluster(test_cluster_grids, neighbor_indices, neighbor_grid)
+                        neighbor_belongs_to_test_cluster = self.validate_can_belong_to_cluster(test_cluster_grids, neighbor_indices, neighbor_grid)
                         if neighbor_belongs_to_test_cluster:
                             if len(cluster_grids.keys) > len(test_cluster_grids.keys):
                                 self.assign_to_cluster_class(test_cluster_grids, class_key)
@@ -293,22 +293,12 @@ class DStreamClusterer():
     def cluster_still_connected_upon_removal(self, grid, removal_indices, removal_grid):
         pass
         #this one might be fun
-
-    '''
-    Both of these
-    TODO
-    '''
-    '''def remove_cluster(self, cluster):
-        pass
-    def add_cluster(self, cluster):
-        pass'''
-    
     
     '''
     this will return bool
     TODO
     '''
-    def validate_belongs_to_cluster(self, cluster, indices, grid):
+    def validate_can_belong_to_cluster(self, cluster, indices, grid):
         pass
     '''
     this will return inside, outside grids
@@ -320,16 +310,46 @@ class DStreamClusterer():
         for indices, grid in grids.items():
             pass
         return inside_grids, outside_grids
-    '''
-    this will return dict of neighboring grids; if cluster is specified, will return neighbors within that cluster
-    TODO
-    '''    
-    def get_neighboring_grids(self, ref_indices, cluster=None):
-        neighbors = {}
-        for indices, grid in cluster.grids.items():
-            pass
-        return neighbors
+
+
         
+        
+        
+        
+    '''below are completed'''
+    def get_neighboring_grids(self, ref_indices):
+        neighbors = {}
+        
+        per_dimension_possible_indices = np.array([])
+        total_possible_neighbors = 1
+        for i in range(self.dimensions):
+            ref_index = ref_indices[i]
+            possibles = np.array([])
+            
+            if ref_index == 0: 
+                possibles = np.append(possibles, 1)
+            elif ref_index == self.domains_per_dimension[i] - 1:
+                possibles = np.append(possibles, ref_index - 1)
+            else:
+                possibles = np.append(possibles, ref_index - 1)
+                possibles = np.append(possibles, ref_index + 1)
+            per_dimension_possible_indices = np.append(per_dimension_possible_indices, possibles)  
+            total_possible_neighbors *= possibles.size                    
+            
+        
+        print 'possible indices: ', per_dimension_possible_indices
+        per_dimension_possible_indices_tuple = tuple(tuple(x) for x in per_dimension_possible_indices)
+        print 'possible indices as tuple: ', per_dimension_possible_indices_tuple        
+        cartesian_product_of_possible_indices = cartesian(per_dimension_possible_indices_tuple)
+        print 'cartesian product of possible indices tuple: ', cartesian_product_of_possible_indices
+        
+        for indices in cartesian_product_of_possible_indices:
+            if self.grids.has_key(indices):
+                grid = self.grids[indices]
+                neighbors[indices] = grid
+        
+        return neighbors
+
     def assign_to_cluster_class(self, grids, class_key):
         for indices, grid in grids.items():
             grid.label = class_key
@@ -441,10 +461,60 @@ class DStreamClusterer():
         top = self.sparse_thresold_parameter * (1.0 - self.decay_factor ** (current_time - last_update_time + 1))
         bottom = self.maximum_grid_count * (1.0 - self.decay_factor)
         return top/bottom
-    
+        
        
         
-    
+def cartesian(arrays, out=None):
+    #from http://stackoverflow.com/questions/1208118/using-numpy-to-build-an-array-of-all-combinations-of-two-arrays
+    #faster than itertools.combination (unverified)
+    """
+    Generate a cartesian product of input arrays.
+
+    Parameters
+    ----------
+    arrays : list of array-like
+        1-D arrays to form the cartesian product of.
+    out : ndarray
+        Array to place the cartesian product in.
+
+    Returns
+    -------
+    out : ndarray
+        2-D array of shape (M, len(arrays)) containing cartesian products
+        formed of input arrays.
+
+    Examples
+    --------
+    >>> cartesian(([1, 2, 3], [4, 5], [6, 7]))
+    array([[1, 4, 6],
+           [1, 4, 7],
+           [1, 5, 6],
+           [1, 5, 7],
+           [2, 4, 6],
+           [2, 4, 7],
+           [2, 5, 6],
+           [2, 5, 7],
+           [3, 4, 6],
+           [3, 4, 7],
+           [3, 5, 6],
+           [3, 5, 7]])
+
+    """
+
+    arrays = [np.asarray(x) for x in arrays]
+    dtype = arrays[0].dtype
+
+    n = np.prod([x.size for x in arrays])
+    if out is None:
+        out = np.zeros([n, len(arrays)], dtype=dtype)
+
+    m = n / arrays[0].size
+    out[:,0] = np.repeat(arrays[0], m)
+    if arrays[1:]:
+        cartesian(arrays[1:], out=out[0:m,1:])
+        for j in xrange(1, arrays[0].size):
+            out[j*m:(j+1)*m,1:] = out[0:m,1:]
+    return out    
 
 
 if __name__ == "__main__":
@@ -460,3 +530,9 @@ if __name__ == "__main__":
     d_stream_characteristic_vector = DStreamCharacteristicVector ()
     print d_stream_characteristic_vector
     
+    test_cart_array = np.array([[0], [2, 3], [4, 5, 6]])
+    print 'test_cart_array: ', test_cart_array
+    test_cart_tuple = tuple(tuple(x) for x in test_cart_array)
+    print 'test_cart_tuple: ', test_cart_tuple
+    test_cart_out = cartesian(test_cart_tuple)
+    print 'test_cart_out: ', test_cart_out
