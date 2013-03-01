@@ -75,7 +75,7 @@ class DStreamClusterer():
         self.gap_time = -1.0
         self.compute_gap_time()
         self.current_time = 0
-        
+        self.last_updated_grids = {}
         
         
     def add_datum(self, datum):
@@ -112,8 +112,7 @@ class DStreamClusterer():
             self.cluster()
             
         self.current_time += 1
-        
-        
+
     def initialize_clusters(self):
 
         self.update_density_category()
@@ -146,24 +145,117 @@ class DStreamClusterer():
             grid.label = 'NO_CLASS'
             self.grids[indices] = grid
         
-        #repeat section TODO
+        
+        '''
+        This eventually needs to be wrapped in a do until no change in clusters
+        TODO
+        '''
+        for i in range(self.clusters.size):
+            cluster = self.clusters[i]
+            inside_grids, outside_grids = self.get_cluster_inside_grids(cluster)
+            for indices, grid in outside_grids.items():
+                neighboring_grids = self.get_neighboring_grids(cluster, indices)
+                for neighbor_indices, neighbor_grid in neighboring_grids.items():
+                    for j in range(self.clusters.size):
+                        test_cluster = self.clusters[j]
+                        neighbor_belongs_to_test_cluster = self.belongs_to_cluster(test_cluster, neighbor_indices, neighbor_grid)
+                        if neighbor_belongs_to_test_cluster:
+                            if len(cluster.grids.keys) > len(test_cluster.grids.keys):
+                                self.remove_cluster(cluster)
+                                cluster.grids = dict(cluster.grids.items() + test_cluster.grids.items())
+                                self.add_cluster(cluster)
+                                self.remove_cluster(test_cluster)
+                            else:
+                                self.remove_cluster(test_cluster)
+                                test_cluster.grids = dict(cluster.grids.items() + test_cluster.grids.items())
+                                self.add_cluster(test_cluster)
+                                self.remove_cluster(cluster)
+                        elif neighbor_grid.label == 'TRANSITIONAL':
+                            self.remove_cluster(cluster)
+                            cluster.grids[neighbor_indices] = neighbor_grid
+                            self.add_cluster(cluster)
+                        
+
+                
         
 
     def cluster(self):
+        self.update_density_category()
+        for indices, grid in self.last_updated_grids.items():
+            if grid.label == 'SPARSE':
+                pass
+    
+
+
+
+
+    '''
+    Both of these
+    TODO
+    '''
+    def remove_cluster(self, cluster):
+        pass
+    def add_cluster(self, cluster):
         pass
     
+    
+    '''
+    this will return bool
+    TODO
+    '''
+    def belongs_to_cluster(self, cluster, indices, grid):
+        pass
+    '''
+    this will return inside, outside tuple dicts
+    TODO
+    '''
+    def get_cluster_inside_grids(self, cluster):
+        inside_grids = {}
+        outside_grids = {}
+        for indices, grid in cluster.grids.items():
+            pass
+        return inside_grids, outside_grids
+    '''
+    this will return array of indices (index tuples)
+    TODO
+    '''    
+    def get_neighboring_grids(self, cluster, ref_indices):
+        neighbors = {}
+        for indices, grid in cluster.grids.items():
+            pass
+        return neighbors
+        
+        
+        
+        
+        
+        
+    def get_cluster_of_grid(self, indices, grid):
+        
+        for i in range(self.clusters.size):
+            if self.clusters[i].grids.has_key(indices):
+                return self.cluster[i]
+        print 'warning - no cluster found with this grid key: ', indices
+        return None  
     def update_density_category(self):
+        self.last_updated_grids = {}
         for indices, grid in self.grids.items():
             if grid.density >= self.dense_threshold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)):
+                if grid.label != 'DENSE':
+                    self.last_updated_grids[indices] = grid
                 grid.label = 'DENSE'
                 print 'grid with indices: ', indices, ' is DENSE'
             if grid.density <= self.sparse_thresold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)):
+                if grid.label != 'SPARSE':
+                    self.last_updated_grids[indices] = grid
                 grid.label = 'SPARSE'
                 print 'grid with indices: ', indices, ' is SPARSE'                
             if grid.density >= self.sparse_thresold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)) and grid.density <= self.dense_threshold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)):
+                if grid.label != 'TRANSITIONAL':
+                    self.last_updated_grids[indices] = grid
                 grid.label = 'TRANSITIONAL'
                 print 'grid with indices: ', indices, ' is TRANSITIONAL' 
-            self.grids[indices] = grid
+            self.grids[indices] = grid       
     def get_dense_grids(self):
         dense_grids = {}
         non_dense_grids = {}
