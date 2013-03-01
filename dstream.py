@@ -1,11 +1,21 @@
 # -*- coding: utf-8 -*-
+import sys
+sys.path.append('libs/networkx-1.7-py2.7.egg')
 import numpy as np
 import random
+import networkx as nx
+import matplotlib.pyplot as plt
+
 
 '''
 
 it looks to me like the adjacency matrix traversal, neighbor finding, and connectedness checking should be done with:
 breadth first search, BFS tree
+
+TODO:
+    -iteration impl
+    -in all the places where a cluster is implicitly created/destroyed (either in init cluster or cluster funcs), must update self.class_keys accordingly (5 locations?)
+
 
 '''
 
@@ -205,12 +215,12 @@ class DStreamClusterer():
             if grid.density_category == 'SPARSE':
                 changed_grid_cluster_class = grid.label
                 cluster_grids_of_changed_grid = self.get_grids_of_cluster_class(changed_grid_cluster_class)
-                would_still_be_connected = self.cluster_still_connected_upon_removal(cluster_grids_of_changed_grid, indices, grid)
+                would_still_be_connected = self.cluster_still_connected_upon_removal(cluster_grids_of_changed_grid, (indices, grid))
                 grid.label = 'NO_CLASS'
                 self.grids[indices] = grid
                 
                 if would_still_be_connected == False:
-                    self.extract_two_clusters_from_grids_having_just_removed_given_grid(cluster_grids_of_changed_grid, indices, grid)
+                    self.extract_two_clusters_from_grids_having_just_removed_given_grid(cluster_grids_of_changed_grid, (indices, grid))
             elif grid.density_category == 'DENSE':
                 if max_size_grid.density_category == 'DENSE':
                     
@@ -252,24 +262,71 @@ class DStreamClusterer():
 
 
 
-    '''
-    TODO
-    yea do what the function says and make sure to properly label the new cluster in self.grids.label
-    '''
-    def extract_two_clusters_from_grids_having_just_removed_given_grid(self, grids_without_removal, removed_indices, removed_grid):
-        #first remove it, then split into two, then add the two
-        pass
-
-    '''
-    TODO
-    '''
-    def cluster_still_connected_upon_removal(self, grid, removal_indices, removal_grid):
-        pass
-        #this one might be fun
-    
-
+    def extract_two_clusters_from_grids_having_just_removed_given_grid(self, grids_without_removal, removed_grid):
+        #first remove it, then split into two, then add the two to self.grids
+        removed_grid_indices = removed_grid[0]
         
+        grids_with_removal =  {key: value for key, value in grids_without_removal if key is not removed_grid_indices}
+        graph_with_removal = self.get_graph_of_cluster(grids_with_removal)
+        subgraphs = nx.connected_component_subgraphs(graph_with_removal)
+        
+        if len(subgraphs) != 2:
+            print 'found more than two subgraphs'
+        
+        for i in range(len(subgraphs)):
+            if i != 0:
+                nodes = subgraphs[i].nodes()
+                new_class_key = self.generate_unique_class_key()
+                self.class_keys = np.append(self.class_keys, new_class_key)
+                for node in nodes:
+                    grid = self.grids[node]
+                    grid.label = new_class_key
+                    self.grids[node] = grid
+            
 
+
+    def cluster_still_connected_upon_removal(self, grids_without_removal, removal_grid):
+        
+        removal_grid_indices = removal_grid[0]
+        
+        grids_with_removal = {key: value for key, value in grids_without_removal if key is not removal_grid_indices}
+        graph_with_removal = self.get_graph_of_cluster(grids_with_removal)
+        return nx.is_connected(graph_with_removal)
+        '''for indices, grid in grids_with_removal.items():
+            for test_indices, test_grid in grids_with_removal.items():
+                path_exists = False
+                try:
+                    path_result = nx.bidirectional_dijkstra(G,indices,test_indices)
+                    path_exists = True
+                except nx.exception.NetworkXNoPath, e:
+                    path_exists = False
+                if path_exists == False:
+                    return False
+        return True'''
+        
+                    
+
+    def get_graph_of_cluster(self, grids):
+        indices_list = grids.keys()
+        G = nx.empty_graph()
+        for i in range(len(indices_list)):
+            indices = indices_list[i]
+            for j in range(len(indices_list)):
+                other_indices = indices_list[j]
+                if self.are_neighbors(indices, other_indices):
+                    if G.has_edge(indices, other_indices) == False:
+                        G.add_edge(indices, other_indices)
+        return G
+        
+    def are_neighbors(self, grid1_indices, grid2_indices):
+        target_identical_count = self.dimensions - 1
+        identical_count = 0
+        for i in range(self.dimensions):
+            if grid1_indices[i] == grid2_indices[i]:
+                identical_count += 1
+            elif np.abs(grid1_indices[i] - grid2_indices[i]) != 1:
+                return False
+        return identical_count == target_identical_count
 
 
 
@@ -327,8 +384,11 @@ class DStreamClusterer():
                 outside_grids[indices] = grid
                 
         return inside_grids, outside_grids
-        
+
     def get_neighboring_grids(self, ref_indices, cluster_grids = None):
+        '''
+        there is obvious room for optimization here using nicer data structures (BFS tree), right now will just test naive approach 
+        '''    
         neighbors = {}
         
         per_dimension_possible_indices = np.array([])
@@ -552,3 +612,24 @@ if __name__ == "__main__":
     print 'test_cart_tuple: ', test_cart_tuple
     test_cart_out = cartesian(test_cart_tuple)
     print 'test_cart_out: ', test_cart_out
+    
+    
+    
+    G=nx.empty_graph()
+    G.add_edge(1,2)
+    G.add_edge(2,3)
+    G.add_edge(2,4)
+    G.add_edge(4,5)
+    G.add_edge(6,7)
+    
+    print 'path btw 1, 5: '
+    print nx.bidirectional_dijkstra(G,1,5)
+    print 'path btw 7, 5: '
+    try:
+        print nx.bidirectional_dijkstra(G,7,5)
+    except nx.exception.NetworkXNoPath, e:
+        print e
+    
+    fig = plt.figure()
+    nx.draw(G)
+    plt.show()
