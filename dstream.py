@@ -145,10 +145,6 @@ class DStreamClusterer():
                 v.label = unique_class_key
                 cluster_grids[k] = v
                 counter += 1
-            #cluster = DStreamCluster(cluster_grids, unique_class_key)
-            
-            #self.clusters = np.append(self.clusters, cluster)
-            #cluster = DStreamCluster(a;osirferj)
         for indices, grid in non_dense_grids.items():
             grid.label = 'NO_CLASS'
             self.grids[indices] = grid
@@ -161,9 +157,6 @@ class DStreamClusterer():
         for i in range(self.class_keys.size):
             class_key = self.class_keys[i]
             cluster_grids = self.get_grids_of_cluster_class(class_key)
-            
-        
-            
             inside_grids, outside_grids = self.get_inside_grids(cluster_grids)
             for indices, grid in outside_grids.items():
                 neighboring_grids = self.get_neighboring_grids(indices)
@@ -172,28 +165,15 @@ class DStreamClusterer():
                         test_class_key = self.class_keys[j]
                         test_cluster_grids = self.get_grids_of_cluster_class(test_class_key)
                         
-                        neighbor_belongs_to_test_cluster = self.validate_can_belong_to_cluster(test_cluster_grids, neighbor_indices, neighbor_grid)
+                        neighbor_belongs_to_test_cluster = self.validate_can_belong_to_cluster(test_cluster_grids, (neighbor_indices, neighbor_grid))
                         if neighbor_belongs_to_test_cluster:
                             if len(cluster_grids.keys) > len(test_cluster_grids.keys):
                                 self.assign_to_cluster_class(test_cluster_grids, class_key)
-                                '''self.remove_cluster(cluster)
-                                cluster.grids = dict(cluster.grids.items() + test_cluster.grids.items())
-                                self.add_cluster(cluster)
-                                self.remove_cluster(test_cluster)'''
                             else:
                                 self.assign_to_cluster_class(cluster_grids, test_class_key)
-                                '''self.remove_cluster(test_cluster)
-                                test_cluster.grids = dict(cluster.grids.items() + test_cluster.grids.items())
-                                self.add_cluster(test_cluster)
-                                self.remove_cluster(cluster)'''
                         elif neighbor_grid.density_category == 'TRANSITIONAL':
                             self.assign_to_cluster_class({neighbor_indices:neighbor_grid}, class_key)
-                            '''self.remove_cluster(cluster)
-                            cluster.grids[neighbor_indices] = neighbor_grid
-                            self.add_cluster(cluster)'''
-                        
 
-                
 
         
     def cluster(self):
@@ -246,7 +226,7 @@ class DStreamClusterer():
                             grids_cluster_grid.label = max_size_cluster_key
                             self.grids[grids_cluster_indices] = grids_cluster_grid
                 elif max_size_grid.density_category == 'TRANSITIONAL':
-                    if grid.label == 'NO_CLASS' and self.grid_becomes_outside_if_other_grid_added_to_cluster(max_size_grid, max_cluster_grids, grid):
+                    if grid.label == 'NO_CLASS' and self.grid_becomes_outside_if_other_grid_added_to_cluster((max_size_indices, max_size_grid), max_cluster_grids, (indices, grid)):
                         grid.label = max_size_cluster_key
                         self.grids[indices] = grid
                     elif len(grids_cluster.keys()) >= max_neighbor_cluster_size:
@@ -259,7 +239,7 @@ class DStreamClusterer():
                     ref_cluster_key = k[1]
                     #ref_indices = k[0]
                     ref_grids = ref_neighbor_cluster_grids
-                    if self.grid_is_outside_if_added_to_cluster(grid, ref_grids) == True:
+                    if self.grid_is_outside_if_added_to_cluster((indices, grid), ref_grids) == True:
                         test_size = len(ref_grids.keys())
                         if test_size > max_outside_cluster_size:
                             max_outside_cluster_size = test_size
@@ -267,16 +247,9 @@ class DStreamClusterer():
                 grid.label = max_outside_cluster_class
                 self.grids[indices] = grid
            
+      
 
 
-    '''TODO'''       
-    def grid_is_outside_if_added_to_cluster(self, test_grid, grids):
-        pass  
-    
-    
-    '''TODO'''
-    def grid_becomes_outside_if_other_grid_added_to_cluster(self, test_grid, cluster_grids, insert_grid):
-        pass
 
 
     '''
@@ -294,22 +267,10 @@ class DStreamClusterer():
         pass
         #this one might be fun
     
-    '''
-    this will return bool
-    TODO
-    '''
-    def validate_can_belong_to_cluster(self, cluster, indices, grid):
-        pass
-    '''
-    this will return inside, outside grids
-    TODO
-    '''
-    def get_inside_grids(self, grids):
-        inside_grids = {}
-        outside_grids = {}
-        for indices, grid in grids.items():
-            pass
-        return inside_grids, outside_grids
+
+        
+
+
 
 
         
@@ -317,7 +278,57 @@ class DStreamClusterer():
         
         
     '''below are completed'''
-    def get_neighboring_grids(self, ref_indices):
+    
+    def validate_can_belong_to_cluster(self, cluster, test_grid):
+        #first validate cluster?
+        print 'checking if grid can be valid in cluster. first doing pre-addition check'
+        is_valid_before = self.is_valid_cluster(cluster)
+        if is_valid_before != True:
+            print 'provided cluster is invalid...returning False'
+            return False
+            
+        cluster[test_grid[0]] = test_grid[1]
+        is_valid_after = self.is_valid_cluster(cluster)
+        return is_valid_after
+        
+    def is_valid_cluster(self, grids):
+        inside_grids, outside_grids = self.get_inside_grids(grids)
+        for indices, grid in inside_grids.items():
+            if grid.density_category != 'DENSE':
+                return False
+        for indices, grid in outside_grids.items():
+            if grid.density_category == 'DENSE':
+                return False
+        return True
+        
+    def grid_becomes_outside_if_other_grid_added_to_cluster(self, test_grid, cluster_grids, insert_grid):
+        cluster_grids[insert_grid[0]] = insert_grid[1]
+        inside_grids, outside_grids = self.get_inside_grids(cluster_grids)
+        if outside_grids.has_key(test_grid[0]):
+            return True
+        return False
+        
+    def grid_is_outside_if_added_to_cluster(self, test_grid, grids):
+        grids[test_grid[0]] = test_grid[1] 
+        inside_grids, outside_grids = self.get_inside_grids(grids)
+        if outside_grids.has_key(test_grid[0]):
+            return True
+        return False
+        
+    def get_inside_grids(self, grids):
+        inside_grids = {}
+        outside_grids = {}
+        target_inside_neighbor_count = 2 * self.dimensions
+        for indices, grid in grids.items():
+            neighboring_grids = self.get_neighboring_grids(indices, grids)
+            if len(neighboring_grids.keys()) == target_inside_neighbor_count:
+                inside_grids[indices] = grid
+            else:
+                outside_grids[indices] = grid
+                
+        return inside_grids, outside_grids
+        
+    def get_neighboring_grids(self, ref_indices, cluster_grids = None):
         neighbors = {}
         
         per_dimension_possible_indices = np.array([])
@@ -344,9 +355,14 @@ class DStreamClusterer():
         print 'cartesian product of possible indices tuple: ', cartesian_product_of_possible_indices
         
         for indices in cartesian_product_of_possible_indices:
-            if self.grids.has_key(indices):
-                grid = self.grids[indices]
-                neighbors[indices] = grid
+            if cluster_grids != None:
+                if cluster_grids.has_key(indices):
+                    grid = cluster_grids[indices]
+                    neighbors[indices] = grid
+            else:
+                if self.grids.has_key(indices):
+                    grid = self.grids[indices]
+                    neighbors[indices] = grid
         
         return neighbors
 
