@@ -13,7 +13,8 @@ there are many other places where I can/should substitute my algs with the new N
 TODO:
     -iteration impl
     -in all the places where a cluster is implicitly created/destroyed (either in init cluster or cluster funcs), must update self.class_keys accordingly (5 locations?)
-
+    -actually cartesian product my be incorrect to use here; neighbors can only have ONE dimensions inex off by one, not all of them off by one. so need to iteratate
+        over dimensions and take ndim-1 points from the test grid and then check if we can fiddle with the other ONE, and repeat for each dim.
 
 '''
 
@@ -50,8 +51,8 @@ class DStreamClusterer():
                  decay_factor = 0.998, #lambda
                  dimensions = 2, 
                  domains_per_dimension = ((0.0, 100.0), (0.0, 100.0)),
-                 partitions_per_dimension = (10, 10)):
-                     
+                 partitions_per_dimension = (50, 50)):
+        print 'provdied: ', dense_threshold_parameter, sparse_threshold_parameter, sporadic_threshold_parameter, decay_factor, dimensions, domains_per_dimension, partitions_per_dimension
         self.dense_threshold_parameter = dense_threshold_parameter
         self.sparse_thresold_parameter = sparse_threshold_parameter
         self.sporadic_threshold_parameter = sporadic_threshold_parameter
@@ -111,6 +112,7 @@ class DStreamClusterer():
             
         if self.current_time == self.gap_time:
             self.initialize_clusters()
+        print "current time, gap time: ", self.current_time, self.gap_time
         if np.mod(self.current_time, self.gap_time) == 0 and self.has_clustered_once:
             sporadic_grids = self.get_sporadic_grids()
             for indices, grid in sporadic_grids.items():
@@ -127,7 +129,7 @@ class DStreamClusterer():
             self.cluster()
             
         self.current_time += 1
-        print 'grids after adding: ', self.grids
+        #print 'grids after adding: ', self.grids
 
     def initialize_clusters(self):
         self.has_clustered_once = True
@@ -510,6 +512,7 @@ class DStreamClusterer():
         max_log = np.log(max_val)/np.log(self.decay_factor)
         gap = np.floor([max_log])
         self.gap_time = gap[0]
+        print 'gap params: ', quotient1, quotient2, max_val, max_log, gap
         print 'computed gap time: ', self.gap_time
         
     def get_grid_indices(self, datum):
@@ -597,7 +600,7 @@ if __name__ == "__main__":
     
     d_stream_clusterer = DStreamClusterer()
     for i in range(150):
-        d_stream_clusterer.add_datum((25.3, 13.1+np.mod(i, 60)))
+        d_stream_clusterer.add_datum((25.4 + np.mod(i+1, 4), 13.1+np.mod(i, 20)))
     '''print d_stream_clusterer
     print 'indices for inserting 35.0, 100.0: ', d_stream_clusterer.get_grid_indices((35.0, 100.0))
     print 'indices for inserting 0.0, 60.0: ', d_stream_clusterer.get_grid_indices((0.0, 60.0))
