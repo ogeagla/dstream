@@ -5,6 +5,7 @@ import numpy as np
 import random
 import networkx as nx
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import copy
 
 
@@ -83,22 +84,26 @@ class DStreamClusterer():
         self.seed = seed        
         self.class_keys = np.array([])
         random.seed(self.seed)
-    def update_class_keys(self):
-        new_keys = np.array([])
-        print 'updating class keys: ', self.class_keys
-        for indices, grid in self.grids.items():
-            if grid.label not in new_keys and grid.label != 'NO_CLASS':
-                print 'new class key ', grid.label
-                new_keys = np.append(new_keys, grid.label)
-        self.class_keys = new_keys
-    def generate_unique_class_key(self):
-        test_key = np.int(np.round(random.uniform(0, 1), 8)*10**8)
-        while test_key in self.class_keys:
-            print 'class key test collision...weird'
-            test_key = np.int(np.round(random.uniform(0, 1), 8)*10**8)
+
+    def get_density_nmatrix(self, grids):
         
-        return test_key
+        nmat = np.zeros(shape=self.partitions_per_dimension)
+        for indices, grid in grids.items():
+            nmat[indices] = grid.density
+        return nmat
         
+    def get_per_cluster_density_nmatrix_dict(self):
+
+        ret_dict = {}
+        for class_key in self.class_keys:
+            grids = self.get_grids_of_cluster_class(class_key)
+            grids_nmat = self.get_density_nmatrix(grids)
+            ret_dict[class_key] = grids_nmat
+        return ret_dict
+                 
+        
+     
+    
     def add_datum(self, datum):
         
         #print 'current time: ', self.current_time, ' and gap time: ', self.gap_time
@@ -188,7 +193,7 @@ class DStreamClusterer():
         
         while iter_count == 0 or diff.size > 0:#last_label_changed_grids.keys()#len(last_label_changed_grids.keys()) != 0:
             print 'iter_count: ', iter_count 
-            raw_input('waiting on return')
+            #raw_input('waiting on return')
             print last_label_changed_grids.keys(), (self.grids[last_label_changed_grids.keys()[0]]).label
             iter_count += 1
             for i in range(self.class_keys.size):
@@ -590,7 +595,22 @@ class DStreamClusterer():
         self.gap_time = gap[0]
         print 'gap params: ', quotient1, quotient2, max_val, max_log, gap
         print 'computed gap time: ', self.gap_time
+    
+    def update_class_keys(self):
+        new_keys = np.array([])
+        #print 'updating class keys: ', self.class_keys
+        for indices, grid in self.grids.items():
+            if grid.label not in new_keys and grid.label != 'NO_CLASS' and grid.label != None:
+                #print 'new class key ', grid.label
+                new_keys = np.append(new_keys, grid.label)
+        self.class_keys = new_keys
+    def generate_unique_class_key(self):
+        test_key = np.int(np.round(random.uniform(0, 1), 8)*10**8)
+        while test_key in self.class_keys:
+            #print 'class key test collision...weird'
+            test_key = np.int(np.round(random.uniform(0, 1), 8)*10**8)
         
+        return test_key   
     def get_grid_indices(self, datum):
         '''
         dimensions = 2, 
@@ -622,11 +642,28 @@ if __name__ == "__main__":
     
     
     d_stream_clusterer = DStreamClusterer()
-    for i in range(50):
+    for i in range(45):
         x = np.mod( i*np.mod(i*2, 7), 100.)
         y = np.mod( np.abs(i*i - i*np.mod(i*3-1, 13)), 100.)
         #print 'x, y: ', x, y
         d_stream_clusterer.add_datum((x, y))
+    den_mat = d_stream_clusterer.get_density_nmatrix(d_stream_clusterer.grids)
+    per_cluster_id_den_mat = d_stream_clusterer.get_per_cluster_density_nmatrix_dict()
+    
+    myColorMap = cm.get_cmap('hot')    
+    
+    fig = plt.figure()
+    im = plt.imshow(den_mat, cmap=myColorMap)
+    plt.colorbar()
+    
+    for class_key, class_den_mat in per_cluster_id_den_mat.items():
+        print class_key
+        fig = plt.figure()
+        im = plt.imshow(class_den_mat, cmap=myColorMap)
+        plt.colorbar()
+    
+    plt.show()
+    
     '''print d_stream_clusterer
     print 'indices for inserting 35.0, 100.0: ', d_stream_clusterer.get_grid_indices((35.0, 100.0))
     print 'indices for inserting 0.0, 60.0: ', d_stream_clusterer.get_grid_indices((0.0, 60.0))
