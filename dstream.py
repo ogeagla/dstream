@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 there are many other places where I can/should substitute my algs with the new NetworkX version using graphs
 
 TODO:
-    -in all the places where a cluster is implicitly created/destroyed (either in init cluster or cluster funcs), must update self.class_keys accordingly (5 locations?)
     -actually cartesian product my be incorrect to use here; neighbors can only have ONE dimensions inex off by one, not all of them off by one. so need to iteratate
         over dimensions and take ndim-1 points from the test grid and then check if we can fiddle with the other ONE, and repeat for each dim.
 
@@ -85,7 +84,12 @@ class DStreamClusterer():
         self.seed = seed        
         self.class_keys = np.array([])
         random.seed(self.seed)
-        
+    def update_class_keys(self):
+        new_keys = np.array([])
+        for indices, grid in self.grids.items():
+            if grid.label not in self.class_keys:
+                new_keys = np.append(new_keys, grid.label)
+        self.class_keys = new_keys
     def generate_unique_class_key(self):
         test_key = np.int(np.round(random.uniform(0, 1), 8)*10**8)
         while test_key in self.class_keys:
@@ -190,7 +194,7 @@ class DStreamClusterer():
                                     self.assign_to_cluster_class(cluster_grids, test_class_key)
                             elif neighbor_grid.density_category == 'TRANSITIONAL':
                                 self.assign_to_cluster_class({neighbor_indices:neighbor_grid}, class_key)
-
+                            self.update_class_keys()
 
         
     def cluster(self):
@@ -234,6 +238,7 @@ class DStreamClusterer():
                 
                 if would_still_be_connected == False:
                     self.extract_two_clusters_from_grids_having_just_removed_given_grid(cluster_grids_of_changed_grid, (indices, grid))
+                self.update_class_keys()
             elif grid.density_category == 'DENSE':
                 if max_size_grid.density_category == 'DENSE':
                     
@@ -270,9 +275,9 @@ class DStreamClusterer():
                 grid.label = max_outside_cluster_class
                 self.grids[indices] = grid
            
-      
+            self.update_class_keys()
 
-
+            
 
 
     def extract_two_clusters_from_grids_having_just_removed_given_grid(self, grids_without_removal, removed_grid):
@@ -296,7 +301,7 @@ class DStreamClusterer():
                     grid.label = new_class_key
                     self.grids[node] = grid
             
-
+    
 
     def cluster_still_connected_upon_removal(self, grids_without_removal, removal_grid):
         
