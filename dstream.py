@@ -5,14 +5,13 @@ import numpy as np
 import random
 import networkx as nx
 import matplotlib.pyplot as plt
+import copy
 
 
 '''
 there are many other places where I can/should substitute my algs with the new NetworkX version using graphs
 
 TODO:
-    -actually cartesian product my be incorrect to use here; neighbors can only have ONE dimensions inex off by one, not all of them off by one. so need to iteratate
-        over dimensions and take ndim-1 points from the test grid and then check if we can fiddle with the other ONE, and repeat for each dim.
 
 '''
 
@@ -409,14 +408,19 @@ class DStreamClusterer():
             else:    
                 per_dimension_possible_indices = np.row_stack((per_dimension_possible_indices,possibles))#np.append(per_dimension_possible_indices, tuple(possibles))  
             print 'pers: ', per_dimension_possible_indices
-            total_possible_neighbors *= possibles.size                    
+            total_possible_neighbors *= possibles.size       
+
+        possible_indices = np.array([])          
+        
+        for i in range(self.dimensions):
             
-        
-        print 'possible indices: ', per_dimension_possible_indices        
-        cartesian_product_of_possible_indices = cartesian(per_dimension_possible_indices)
-        print 'cartesian product of possible indices tuple: ', cartesian_product_of_possible_indices
-        
-        for indices in cartesian_product_of_possible_indices:
+            possibles = per_dimension_possible_indices[i]
+            for j in range(possibles.size):
+                ref_new = np.array(copy.deepcopy(ref_indices))
+                ref_new[i] = possibles[j]
+                possible_indices = np.append(possible_indices, ref_new)
+                
+        for indices in possible_indices:
             indices = tuple(indices)
             print 'testing if in cluster: ', indices
             if cluster_grids != None:
@@ -554,66 +558,12 @@ class DStreamClusterer():
         top = self.sparse_thresold_parameter * (1.0 - self.decay_factor ** (current_time - last_update_time + 1))
         bottom = self.maximum_grid_count * (1.0 - self.decay_factor)
         return top/bottom
-        
-       
-        
-def cartesian(arrays, out=None):
-    #from http://stackoverflow.com/questions/1208118/using-numpy-to-build-an-array-of-all-combinations-of-two-arrays
-    #faster than itertools.combination (unverified)
-    """
-    Generate a cartesian product of input arrays.
-
-    Parameters
-    ----------
-    arrays : list of array-like
-        1-D arrays to form the cartesian product of.
-    out : ndarray
-        Array to place the cartesian product in.
-
-    Returns
-    -------
-    out : ndarray
-        2-D array of shape (M, len(arrays)) containing cartesian products
-        formed of input arrays.
-
-    Examples
-    --------
-    >>> cartesian(([1, 2, 3], [4, 5], [6, 7]))
-    array([[1, 4, 6],
-           [1, 4, 7],
-           [1, 5, 6],
-           [1, 5, 7],
-           [2, 4, 6],
-           [2, 4, 7],
-           [2, 5, 6],
-           [2, 5, 7],
-           [3, 4, 6],
-           [3, 4, 7],
-           [3, 5, 6],
-           [3, 5, 7]])
-
-    """
-
-    arrays = [np.asarray(x) for x in arrays]
-    dtype = arrays[0].dtype
-
-    n = np.prod([x.size for x in arrays])
-    if out is None:
-        out = np.zeros([n, len(arrays)], dtype=dtype)
-
-    m = n / arrays[0].size
-    out[:,0] = np.repeat(arrays[0], m)
-    if arrays[1:]:
-        cartesian(arrays[1:], out=out[0:m,1:])
-        for j in xrange(1, arrays[0].size):
-            out[j*m:(j+1)*m,1:] = out[0:m,1:]
-    return out    
 
 
 if __name__ == "__main__":
     
     d_stream_clusterer = DStreamClusterer()
-    for i in range(150):
+    for i in range(1):
         d_stream_clusterer.add_datum((25.4 + np.mod(i+1, 4), 13.1+np.mod(i, 20)))
     '''print d_stream_clusterer
     print 'indices for inserting 35.0, 100.0: ', d_stream_clusterer.get_grid_indices((35.0, 100.0))
