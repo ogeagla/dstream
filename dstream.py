@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 there are many other places where I can/should substitute my algs with the new NetworkX version using graphs
 
 TODO:
-    -iteration impl
     -in all the places where a cluster is implicitly created/destroyed (either in init cluster or cluster funcs), must update self.class_keys accordingly (5 locations?)
     -actually cartesian product my be incorrect to use here; neighbors can only have ONE dimensions inex off by one, not all of them off by one. so need to iteratate
         over dimensions and take ndim-1 points from the test grid and then check if we can fiddle with the other ONE, and repeat for each dim.
@@ -28,7 +27,8 @@ class DStreamCharacteristicVector():
                  last_update_time=-1, 
                  last_sporadic_removal_time=-1, 
                  last_marked_sporadic_time=-1,
-                 category_changed_last_time=False):
+                 category_changed_last_time=False,
+                 label_changed_last_iteration=True):
         
         self.last_update_time = last_update_time
         self.last_sporadic_removal_time = last_sporadic_removal_time
@@ -38,6 +38,7 @@ class DStreamCharacteristicVector():
         self.label = label
         self.status = status
         self.category_changed_last_time = category_changed_last_time
+        self.label_changed_last_iteration = label_changed_last_iteration
         
 
 class DStreamClusterer():  
@@ -168,29 +169,27 @@ class DStreamClusterer():
             self.grids[indices] = grid
         
         
-        '''
-        This eventually needs to be wrapped in a do until no change in clusters
-        TODO
-        '''
-        for i in range(self.class_keys.size):
-            class_key = self.class_keys[i]
-            cluster_grids = self.get_grids_of_cluster_class(class_key)
-            inside_grids, outside_grids = self.get_inside_grids(cluster_grids)
-            for indices, grid in outside_grids.items():
-                neighboring_grids = self.get_neighboring_grids(indices)
-                for neighbor_indices, neighbor_grid in neighboring_grids.items():
-                    for j in range(self.class_keys.size):
-                        test_class_key = self.class_keys[j]
-                        test_cluster_grids = self.get_grids_of_cluster_class(test_class_key)
-                        
-                        neighbor_belongs_to_test_cluster = self.validate_can_belong_to_cluster(test_cluster_grids, (neighbor_indices, neighbor_grid))
-                        if neighbor_belongs_to_test_cluster:
-                            if len(cluster_grids.keys) > len(test_cluster_grids.keys):
-                                self.assign_to_cluster_class(test_cluster_grids, class_key)
-                            else:
-                                self.assign_to_cluster_class(cluster_grids, test_class_key)
-                        elif neighbor_grid.density_category == 'TRANSITIONAL':
-                            self.assign_to_cluster_class({neighbor_indices:neighbor_grid}, class_key)
+        while len(self.get_last_label_changed().keys()) != 0:
+            for i in range(self.class_keys.size):
+                class_key = self.class_keys[i]
+                cluster_grids = self.get_grids_of_cluster_class(class_key)
+                inside_grids, outside_grids = self.get_inside_grids(cluster_grids)
+                for indices, grid in outside_grids.items():
+                    neighboring_grids = self.get_neighboring_grids(indices)
+                    for neighbor_indices, neighbor_grid in neighboring_grids.items():
+                        for j in range(self.class_keys.size):
+                            test_class_key = self.class_keys[j]
+                            test_cluster_grids = self.get_grids_of_cluster_class(test_class_key)
+                            
+                            neighbor_belongs_to_test_cluster = self.validate_can_belong_to_cluster(test_cluster_grids, (neighbor_indices, neighbor_grid))
+                            self.reset_last_label_changed()                        
+                            if neighbor_belongs_to_test_cluster:
+                                if len(cluster_grids.keys) > len(test_cluster_grids.keys):
+                                    self.assign_to_cluster_class(test_cluster_grids, class_key)
+                                else:
+                                    self.assign_to_cluster_class(cluster_grids, test_class_key)
+                            elif neighbor_grid.density_category == 'TRANSITIONAL':
+                                self.assign_to_cluster_class({neighbor_indices:neighbor_grid}, class_key)
 
 
         
@@ -427,10 +426,20 @@ class DStreamClusterer():
                     neighbors[indices] = grid
         
         return neighbors
-
+    def get_last_label_changed(self):
+        grids = {}
+        for indices, grid in self.grids.items():
+            if grid.label_changed_last_iteration == True:
+                grids[indices] = grid
+        return grids
+    def reset_last_label_changed(self):
+        for indices, grid in self.grids.items():
+            grid.label_changed_last_iteration = False
+            self.grids[indices] = grid
     def assign_to_cluster_class(self, grids, class_key):
         for indices, grid in grids.items():
             grid.label = class_key
+            grid.label_changed_last_iteration = True
             self.grids[indices] = grid
             
     def get_grids_of_cluster_class(self, class_key):
