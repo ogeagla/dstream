@@ -13,6 +13,8 @@ import copy
 there are many other places where I can/should substitute my algs with the new NetworkX version using graphs
 
 TODO:
+    -double check algos by hand
+    -visuals
 
 '''
 
@@ -45,13 +47,13 @@ class DStreamClusterer():
     Initialize with defaults from reference algorithm
     '''
     def __init__(self, 
-                 dense_threshold_parameter = 3.0, #C_m
-                 sparse_threshold_parameter = 0.8,  #C_l
-                 sporadic_threshold_parameter = 0.3, #beta
-                 decay_factor = 0.998, #lambda
+                 dense_threshold_parameter = 3.0,#3.0, #C_m
+                 sparse_threshold_parameter = 0.8,#0.8,  #C_l
+                 sporadic_threshold_parameter = 0.3,#0.3, #beta
+                 decay_factor = 0.998,#0.998, #lambda
                  dimensions = 2, 
                  domains_per_dimension = ((0.0, 100.0), (0.0, 100.0)),
-                 partitions_per_dimension = (10, 10)):
+                 partitions_per_dimension = (5, 5)):
         print 'provdied: ', dense_threshold_parameter, sparse_threshold_parameter, sporadic_threshold_parameter, decay_factor, dimensions, domains_per_dimension, partitions_per_dimension
         self.dense_threshold_parameter = dense_threshold_parameter
         self.sparse_thresold_parameter = sparse_threshold_parameter
@@ -84,11 +86,16 @@ class DStreamClusterer():
         self.seed = seed        
         self.class_keys = np.array([])
         random.seed(self.seed)
+        
+    def get_coordinate_tuple_density(self, grids):
+        #returns for example (x, y, density)
+        pass
 
     def get_density_nmatrix(self, grids):
         
         nmat = np.zeros(shape=self.partitions_per_dimension)
         for indices, grid in grids.items():
+            #print indices
             nmat[indices] = grid.density
         return nmat
         
@@ -624,9 +631,9 @@ class DStreamClusterer():
             partitions = self.partitions_per_dimension[i]
             
             index = np.floor([(datum[i]/domain_tuple[1])*(partitions)])[0]
-            if index == partitions:
+            if index >= partitions:
                 print 'index equals partitions: ', index, partitions
-                index -= 1
+                index = partitions - 1
             indices = np.append(indices, index)
         return indices
     
@@ -640,13 +647,29 @@ class DStreamClusterer():
 
 if __name__ == "__main__":
     
+    for i in range(16):
+        d_stream_clusterer = DStreamClusterer(partitions_per_dimension=(2*i, 2*i))
     
-    d_stream_clusterer = DStreamClusterer()
-    for i in range(45):
-        x = np.mod( i*np.mod(i*2, 7), 100.)
-        y = np.mod( np.abs(i*i - i*np.mod(i*3-1, 13)), 100.)
+    #raw_input('step2')
+    
+    npts = 14
+    
+    d_stream_clusterer = DStreamClusterer(partitions_per_dimension=(npts,npts))
+    
+    np.random.seed(331)
+    for i in range(3000):
+        '''x = np.random.standard_normal() * 10.0 + 20.0 
+    
+        y = np.random.standard_normal() * 10.0 + 20.0
+        #print 'x, y: ', x, y
+        d_stream_clusterer.add_datum((x, y))'''
+        
+        x = np.random.standard_normal() * 10.0 + 80.0 
+    
+        y = np.random.standard_normal() * 10.0 + 80.0
         #print 'x, y: ', x, y
         d_stream_clusterer.add_datum((x, y))
+        
     den_mat = d_stream_clusterer.get_density_nmatrix(d_stream_clusterer.grids)
     per_cluster_id_den_mat = d_stream_clusterer.get_per_cluster_density_nmatrix_dict()
     
@@ -657,7 +680,7 @@ if __name__ == "__main__":
     plt.colorbar()
     
     for class_key, class_den_mat in per_cluster_id_den_mat.items():
-        print class_key
+        print 'class: ', class_key, 'grids: ', len(d_stream_clusterer.get_grids_of_cluster_class(class_key).keys())
         fig = plt.figure()
         im = plt.imshow(class_den_mat, cmap=myColorMap)
         plt.colorbar()
