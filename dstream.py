@@ -47,7 +47,7 @@ class DStreamClusterer():
     Initialize with defaults from reference algorithm
     '''
     def __init__(self, 
-                 dense_threshold_parameter = 3.0,#3.0, #C_m
+                 dense_threshold_parameter = 2.0,#3.0, #C_m
                  sparse_threshold_parameter = 0.8,#0.8,  #C_l
                  sporadic_threshold_parameter = 0.3,#0.3, #beta
                  decay_factor = 0.998,#0.998, #lambda
@@ -87,9 +87,7 @@ class DStreamClusterer():
         self.class_keys = np.array([])
         random.seed(self.seed)
         
-    def get_coordinate_tuple_density(self, grids):
-        #returns for example (x, y, density)
-        pass
+        
 
     def get_density_nmatrix(self, grids):
         
@@ -124,15 +122,18 @@ class DStreamClusterer():
                 grid = self.removed_grid_cache[indices]
             else:
                 grid = DStreamCharacteristicVector()
-                
+        old_density = grid.density                
         grid.density = 1.0 + grid.density*self.decay_factor**(self.current_time - grid.last_update_time)
+        print 'grid at indices {} updated density from {} to {}'.format(indices, old_density, grid.density)
+        
         grid.last_update_time = self.current_time
         self.grids[indices] = grid
         print 'current time: ', self.current_time, ' ', indices, ' added to grids; all count: ', len(self.grids.keys())
+        
         if self.current_time >= self.gap_time - 1:
             print '$$$ clusters before: ', self.class_keys
             
-        if self.current_time == self.gap_time:
+        if self.current_time >= self.gap_time and not self.has_clustered_once:
             print 'initializing clusters'
             self.initialize_clusters()
             print 'clusters after: ', self.class_keys
@@ -158,13 +159,20 @@ class DStreamClusterer():
         #print 'grids after adding: ', self.grids
 
     def initialize_clusters(self):
-        self.has_clustered_once = True
+        
+        
         self.update_density_category()
         
         cluster_counts = np.array([])
         dense_grids, non_dense_grids = self.get_dense_grids()
+        print 'dense count: {} non-dense count: {}'.format(len(dense_grids.keys()), len(non_dense_grids.keys()))
+        
+        if len(dense_grids.keys()) == 0:
+            print 'no dense clusters'
+            #self.cluster_count = 0
+            return
+        
         cluster_size = np.round(len(dense_grids.keys())/self.cluster_count)
-        print 'dense count: {} non-dense count: {} cluster count: {} cluster size: {}'.format(len(dense_grids.keys()), len(non_dense_grids.keys()), self.cluster_count, cluster_size)
         
         print 'cluster size: ', cluster_size
         for i in range(self.cluster_count):
@@ -213,23 +221,28 @@ class DStreamClusterer():
                 for indices, grid in outside_grids.items():
                     neighboring_grids = self.get_neighboring_grids(indices)
                     for neighbor_indices, neighbor_grid in neighboring_grids.items():
+                        print 'class key sizes: ', self.class_keys.size
                         for j in range(self.class_keys.size):
+                            print j
                             test_class_key = self.class_keys[j]
                             test_cluster_grids = self.get_grids_of_cluster_class(test_class_key)
+                            
+                                                       
                             
                             neighbor_belongs_to_test_cluster = self.validate_can_belong_to_cluster(test_cluster_grids, (neighbor_indices, neighbor_grid))
                             self.reset_last_label_changed()                        
                             if neighbor_belongs_to_test_cluster:
-                                if len(cluster_grids.keys) > len(test_cluster_grids.keys):
+                                if len(cluster_grids.keys()) > len(test_cluster_grids.keys()):
                                     self.assign_to_cluster_class(test_cluster_grids, class_key)
                                 else:
                                     self.assign_to_cluster_class(cluster_grids, test_class_key)
                             elif neighbor_grid.density_category == 'TRANSITIONAL':
                                 self.assign_to_cluster_class({neighbor_indices:neighbor_grid}, class_key)
-                            self.update_class_keys()
+                            #self.update_class_keys()
             last_label_changed_grids_2 = last_label_changed_grids
             last_label_changed_grids = self.get_last_label_changed()
             diff  = np.setdiff1d(np.array(last_label_changed_grids.keys()), np.array(last_label_changed_grids_2.keys()))
+        self.has_clustered_once = True
     def cluster(self):
         self.update_density_category()
         for indices, grid in self.get_most_recently_categorically_changed_grids().items():
@@ -539,29 +552,34 @@ class DStreamClusterer():
     def update_density_category(self):
         #self.last_updated_grids = {}
         for indices, grid in self.grids.items():
-            if grid.density >= self.dense_threshold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)):
+            dense_param = self.dense_threshold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor))
+            sparse_param = self.sparse_thresold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor))
+            test_density = grid.density
+            print 'test density {} dense thresh {} sparse thresh {}'.format(test_density, dense_param, sparse_param)
+            if test_density >= dense_param:
                 if grid.density_category != 'DENSE':
                     grid.category_changed_last_time = True
                 else:
                     grid.category_changed_last_time = False
                     
                 grid.density_category = 'DENSE'
-                #print 'grid with indices: ', indices, ' is DENSE'
-            if grid.density <= self.sparse_thresold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)):
+                print 'grid with indices: ', indices, ' is DENSE'
+            if test_density <= sparse_param:
                 if grid.density_category != 'SPARSE':
                     grid.category_changed_last_time = True
                 else:
                     grid.category_changed_last_time = False
                 grid.density_category = 'SPARSE'
-                #print 'grid with indices: ', indices, ' is SPARSE'                
-            if grid.density >= self.sparse_thresold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)) and grid.density <= self.dense_threshold_parameter/(self.maximum_grid_count*(1.0-self.decay_factor)):
+                print 'grid with indices: ', indices, ' is SPARSE'                
+            if test_density >= sparse_param and grid.density <= dense_param:
                 if grid.density_category != 'TRANSITIONAL':
                     grid.category_changed_last_time = True
                 else:
                     grid.category_changed_last_time = False
                 grid.density_category = 'TRANSITIONAL'
-                #print 'grid with indices: ', indices, ' is TRANSITIONAL' 
-            self.grids[indices] = grid       
+                print 'grid with indices: ', indices, ' is TRANSITIONAL' 
+            self.grids[indices] = grid   
+            
     def get_dense_grids(self):
         dense_grids = {}
         non_dense_grids = {}
@@ -645,6 +663,16 @@ class DStreamClusterer():
         return top/bottom
 
 
+    '''
+    Test:
+    -get grid indices
+    -ensure if unique grid it gets created properly or fetched from cache
+    
+    Todo:
+    -when cluster is being initialized, if no clusters are valid, defer initializing until we can create at least 1 valid one?  i guess
+    -in cluster init, given dense grid, try to make cluster around it, if not, then its not valid right?  should be repeated next gaptime
+    '''    
+    
 if __name__ == "__main__":
     
     for i in range(16):
@@ -652,17 +680,17 @@ if __name__ == "__main__":
     
     #raw_input('step2')
     
-    npts = 14
+    npts = 8
     
     d_stream_clusterer = DStreamClusterer(partitions_per_dimension=(npts,npts))
     
     np.random.seed(331)
-    for i in range(3000):
-        '''x = np.random.standard_normal() * 10.0 + 20.0 
+    for i in range(100):
+        x = np.random.standard_normal() * 10.0 + 20.0 
     
         y = np.random.standard_normal() * 10.0 + 20.0
         #print 'x, y: ', x, y
-        d_stream_clusterer.add_datum((x, y))'''
+        d_stream_clusterer.add_datum((x, y))
         
         x = np.random.standard_normal() * 10.0 + 80.0 
     
