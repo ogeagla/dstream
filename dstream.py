@@ -15,8 +15,31 @@ there are many other places where I can/should substitute my algs with the new N
 TODO:
     -double check algos by hand
     -visuals
-
+    
+    -***after every clustering, i need to merge connected/neighboring clusters trivially; for example target sizes of 1 and 2 grids and do a manual merge
+    - use the transemu client code to sample a n-dim distro from a provided n-dim matrix (ie build the cum, sample uniform, get value)
+    - do some freaking nicer visuals otherwise i cant see anything.
+    - also log some important stats...all the time
 '''
+
+class NMatrixSampler():
+    def __init__(self,
+                 nmat):
+       self.density_matrix = nmat
+       self.dimensions = len(nmat.shape)
+       for d in self.dimensions:
+           
+               
+       
+       self.stateChangeProbabilitiesCumulative = []
+       for i in range(len(self.stateChangeProbabilities)):
+           rowSum = 0.0
+           row = []
+       for j in range(len(self.stateChangeProbabilities[i])):
+           rowSum = rowSum + self.stateChangeProbabilities[i][j]
+           row.append(rowSum)                
+       self.stateChangeProbabilitiesCumulative.append(row)
+          
 
 class DStreamCharacteristicVector():
     
@@ -47,7 +70,7 @@ class DStreamClusterer():
     Initialize with defaults from reference algorithm
     '''
     def __init__(self, 
-                 dense_threshold_parameter = 2.0,#3.0, #C_m
+                 dense_threshold_parameter = 3.0,#3.0, #C_m
                  sparse_threshold_parameter = 0.8,#0.8,  #C_l
                  sporadic_threshold_parameter = 0.3,#0.3, #beta
                  decay_factor = 0.998,#0.998, #lambda
@@ -285,7 +308,7 @@ class DStreamClusterer():
                 
                 if would_still_be_connected == False:
                     self.extract_two_clusters_from_grids_having_just_removed_given_grid(cluster_grids_of_changed_grid, (indices, grid))
-                self.update_class_keys()
+                
             elif grid.density_category == 'DENSE':
                 if max_size_grid.density_category == 'DENSE':
                     
@@ -321,12 +344,31 @@ class DStreamClusterer():
                             max_outside_cluster_class = ref_cluster_key
                 grid.label = max_outside_cluster_class
                 self.grids[indices] = grid
-           
+            
             self.update_class_keys()
-
+        self.merge_clusters()
+        self.update_class_keys()
             
 
-
+    def merge_clusters(self):  
+        
+        #merge clusters of size 1
+        one_grid_clusters = {}
+        for class_key in self.class_keys:
+            grids = self.get_grids_of_cluster_class(class_key)
+            if len(grids.keys()) == 1:
+                for indices, grid in grids.items():
+                    one_grid_clusters[indices] = grid
+        #this is such a poor method, it hurts:
+        for indices, grid in one_grid_clusters.items():
+            
+            for test_indices, test_grid in one_grid_clusters.items():
+                
+                if self.are_neighbors(indices, test_indices) == True:
+                    test_grid.label = grid.label
+                    self.grids[test_indices] = test_grid
+                
+    
     def extract_two_clusters_from_grids_having_just_removed_given_grid(self, grids_without_removal, removed_grid):
         #first remove it, then split into two, then add the two to self.grids
         removed_grid_indices = removed_grid[0]
@@ -680,23 +722,29 @@ if __name__ == "__main__":
     
     #raw_input('step2')
     
-    npts = 8
+    npts = 6
     
     d_stream_clusterer = DStreamClusterer(partitions_per_dimension=(npts,npts))
     
     np.random.seed(331)
-    for i in range(100):
-        x = np.random.standard_normal() * 10.0 + 20.0 
+    for i in range(800):
+        '''x = np.random.standard_normal() * 10.0 + 20.0 
     
         y = np.random.standard_normal() * 10.0 + 20.0
         #print 'x, y: ', x, y
-        d_stream_clusterer.add_datum((x, y))
+        d_stream_clusterer.add_datum((x, y))'''
+
+                        
         
-        x = np.random.standard_normal() * 10.0 + 80.0 
+        x = np.random.standard_normal() * 10.0 + 10.0 
     
-        y = np.random.standard_normal() * 10.0 + 80.0
-        #print 'x, y: ', x, y
-        d_stream_clusterer.add_datum((x, y))
+        y = np.random.standard_normal() * 10.0 + 10.0
+        
+        if x <= 100.0 and x >= 0.0 and y <= 100.0 and y >= 0.0:
+            d_stream_clusterer.add_datum((x, y))
+        else:
+            continue
+        
         
     den_mat = d_stream_clusterer.get_density_nmatrix(d_stream_clusterer.grids)
     per_cluster_id_den_mat = d_stream_clusterer.get_per_cluster_density_nmatrix_dict()
