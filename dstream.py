@@ -22,23 +22,35 @@ TODO:
     - also log some important stats...all the time
 '''
 
-class NMatrixSampler():
-    def __init__(self,
-                 nmat):
-       self.density_matrix = nmat
-       self.dimensions = len(nmat.shape)
-       for d in self.dimensions:
-           
-               
-       
-       self.stateChangeProbabilitiesCumulative = []
-       for i in range(len(self.stateChangeProbabilities)):
-           rowSum = 0.0
-           row = []
-       for j in range(len(self.stateChangeProbabilities[i])):
-           rowSum = rowSum + self.stateChangeProbabilities[i][j]
-           row.append(rowSum)                
-       self.stateChangeProbabilitiesCumulative.append(row)
+class ClusterDisplay2D():
+    
+    @staticmethod
+    def display_all_grid_and_clusters(grids, class_keys):
+        pass
+    
+
+class NMeanSampler2D():
+    
+    def __init__(self, means_coords, means_scales, seed):
+        
+        self.means = means_coords
+        self.means_scales = means_scales
+        print means.shape, means_scales.shape
+        self.seed = seed
+        np.random.seed(seed)
+    
+    def get_sample(self):
+        rand_uni = np.random.uniform()
+        mean_index = np.int(np.floor(rand_uni * self.means.shape[0]))
+        
+        mean = self.means[mean_index, :]
+        mean_scale = self.means_scales[mean_index, :]
+        print 'sampling from mean: ', mean
+        x = np.random.normal(loc = mean[0], scale = mean_scale[0])
+        y = np.random.normal(loc = mean[1], scale = mean_scale[1])
+        
+        return np.array([x, y])
+        
           
 
 class DStreamCharacteristicVector():
@@ -717,6 +729,53 @@ class DStreamClusterer():
     
 if __name__ == "__main__":
     
+    np.random.seed(331)
+    
+    
+    '''
+    I can/should abstract this mean/scaling stuff to the NMeanSampler2D thing
+    
+    '''
+    means_count = 3
+    x_domain = (0.0, 100.0)
+    y_domain = (0.0, 100.0)
+
+    means = np.ndarray(shape=(means_count, 2))    
+    means_scales = np.ndarray(shape=(means_count, 2))    
+    
+    means[0,0] = 0.15#x1, normalized
+    means[0,1] = 0.2#y1 
+    means_scales[0,0] = 0.05
+    means_scales[0,1] = 0.08
+        
+    
+    means[1,0] = 0.65
+    means[1,1] = 0.25
+    means_scales[1,0] = 0.15
+    means_scales[1,1] = 0.1
+    
+    means[2,0] = 0.45
+    means[2,1] = 0.55
+    means_scales[2,0] = 0.08
+    means_scales[2,1] = 0.13
+    
+    means[:, 0] = means[:,0] * (x_domain[1] - x_domain[0])
+    means[:, 1] = means[:,1] * (y_domain[1] - y_domain[0])
+    
+    means_scales[:, 0] = means_scales[:,0] * (x_domain[1] - x_domain[0])
+    means_scales[:, 1] = means_scales[:,1] * (y_domain[1] - y_domain[0])
+    
+    
+    nms2d = NMeanSampler2D(means, means_scales, 331)
+    test_data_size = 100
+    cluster_test_data = np.ndarray(shape=(test_data_size,2))
+    for i in range(test_data_size):
+        datum = nms2d.get_sample()
+        cluster_test_data[i, :] = datum
+        
+    print cluster_test_data
+    raw_input('exit here')    
+    
     for i in range(16):
         d_stream_clusterer = DStreamClusterer(partitions_per_dimension=(2*i, 2*i))
     
@@ -726,7 +785,7 @@ if __name__ == "__main__":
     
     d_stream_clusterer = DStreamClusterer(partitions_per_dimension=(npts,npts))
     
-    np.random.seed(331)
+    
     for i in range(800):
         '''x = np.random.standard_normal() * 10.0 + 20.0 
     
