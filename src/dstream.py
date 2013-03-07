@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-import sys
-sys.path.append('libs/networkx-1.7-py2.7.egg')
+'''import sys
+sys.path.append('libs/networkx-1.7-py2.7.egg')'''
 import numpy as np
 import random
 import networkx as nx
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 import matplotlib.cm as cm
 import copy
 
@@ -15,7 +14,9 @@ there are many other places where I can/should substitute my algs with the new N
 
 TODO:
     -instead of sampling by always producing a new sample from a random of N pdfs, better sample everything offline, add noise and then sample by randomly selecting from the array of already-sampled and noise.
+        -along those lines, also extend the above idea to support time-dep pdf sampling weights    
     -better merge of current clusters
+        -*this can be done by combinig their graphs and then getting all proper subgraphs; if there are more than 1, you cant merge them! simple
     -validate/check for 'None's in grid.label and grid.status.  they should NOT appear after a call to cluster.
     -current params are good, analyze this setup and see why it "doesnt"(?) work well
     
@@ -86,7 +87,7 @@ class ClusterDisplay2D():
             
             ax.scatter(x, y, marker = mark, c = class_color, s=grid.density*10, linewidths = 0.1,label= ' ' + str(class_key))
         if save:
-            plt.savefig('figs/dstream' + '_' + plot_name + '_' + str(ref_data[:,0].size) + '.png', bbox_inches = 0)
+            plt.savefig('../figs/dstream' + '_' + plot_name + '_' + str(ref_data[:,0].size) + '.png', bbox_inches = 0)
             #plt.savefig(filename + '.pdf', bbox_inches = 0)
         #leg = ax.legend(loc=2)
 
@@ -445,6 +446,10 @@ class DStreamClusterer():
             
 
     def merge_clusters(self):  
+        
+        ''' do new graph operations here
+        '''        
+        
         
         #merge clusters of size 1
         one_grid_clusters = {}
