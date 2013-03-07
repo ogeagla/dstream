@@ -5,6 +5,7 @@ import numpy as np
 import random
 import networkx as nx
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 import matplotlib.cm as cm
 import copy
 
@@ -23,19 +24,90 @@ TODO:
 '''
 
 class ClusterDisplay2D():
-    
     @staticmethod
-    def display_all_grid_and_clusters(grids, class_keys):
-        pass
-    
+    def display_ref_data(ref_data, partitions_per_dimension):
+        
+        x = ref_data[:, 0]
+        y = ref_data[:, 1]        
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        
+        H, xedges, yedges = np.histogram2d(x, y, bins=(10, 10))#partitions_per_dimension)
+        extent = [yedges[0], yedges[-1], xedges[-1], xedges[0]]
+        plt.imshow(H, extent=extent, interpolation='nearest')        
+        
+        plt.colorbar()
+        
+        
+        
+    @staticmethod
+    def display_all(grids, class_keys, ref_data, partitions_per_dimension, domains_per_dimension):
+        class_key_colors = {}
+        color_map = cm.get_cmap('hsv') 
+        for i in range(class_keys.size):
+            class_key_colors[class_keys[i]] = color_map(np.float(i)/np.float(class_keys.size))
+        #scat = ax.scatter(xPlot,yPlot,s=area, marker='o', c='y', linewidths=0.1, label='metric data')
+        
+        x_domain = domains_per_dimension[0]
+        x_domain_size = x_domain[1] - x_domain[0]
+        x_partitions = partitions_per_dimension[0]
+        x_cluster_width = x_domain_size/x_partitions
+        
+        y_domain = domains_per_dimension[1]
+        y_domain_size = y_domain[1] - y_domain[0]
+        y_partitions = partitions_per_dimension[1]
+        y_cluster_width = y_domain_size/y_partitions
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.set_title('dstream')
+        #print x_domain, y_domain, x_domain_size, y_domain_size, x_partitions, y_partitions
+        x_ticks = np.arange(x_domain[0], x_domain[1]+ x_domain[1]/1000.0, x_cluster_width)
+        y_ticks = np.arange(y_domain[0], y_domain[1] + y_domain[1]/1000.0 , y_cluster_width)
+        ax.set_xticks(x_ticks)
+        ax.set_yticks(y_ticks)
+        
+        for x_tick in x_ticks:
+            ax.axvline(x=x_tick, c='b')
+        for y_tick in y_ticks:
+            ax.axhline(y=y_tick, c= 'b')
+        '''for i in range(binCount + 1):
+        line = ax.axvline(x=lineCounter, c='g')
+        lineCounter += deltaBin'''
+        
+        print ref_data.shape
+        ref_data_scatter = ax.scatter(ref_data[:, 0], ref_data[:, 1], marker = 'o', c = 'r', linewidths = 0.1, label = 'ref data', s=2.0)
+        
+
+            
+        for indices, grid in grids.items():
+            class_key = grid.label
+            print class_key
+            if class_key == 'NO_CLASS':
+                class_color = (0.8, 0.8, 0.8)
+            elif class_key != None:
+                class_color = class_key_colors[class_key]
+                
+            x = indices[0] * x_cluster_width + x_cluster_width * 0.5
+            y = indices[1] * y_cluster_width + y_cluster_width * 0.5
+            
+            ax.scatter(x, y, marker = '^', c = class_color, s=grid.density*10, linewidths = 0.1,label= ' ' + str(class_key))
+        #leg = ax.legend(loc=2)
 
 class NMeanSampler2D():
     
-    def __init__(self, means_coords, means_scales, seed):
+    def __init__(self, means, means_scales, x_domain, y_domain, seed):
         
-        self.means = means_coords
+        means[:, 0] = means[:,0] * (x_domain[1] - x_domain[0])
+        means[:, 1] = means[:,1] * (y_domain[1] - y_domain[0])
+    
+        means_scales[:, 0] = means_scales[:,0] * (x_domain[1] - x_domain[0])
+        means_scales[:, 1] = means_scales[:,1] * (y_domain[1] - y_domain[0])        
+        
+        self.means = means
         self.means_scales = means_scales
-        print means.shape, means_scales.shape
+        #print means.shape, means_scales.shape
         self.seed = seed
         np.random.seed(seed)
     
@@ -45,7 +117,7 @@ class NMeanSampler2D():
         
         mean = self.means[mean_index, :]
         mean_scale = self.means_scales[mean_index, :]
-        print 'sampling from mean: ', mean
+        #print 'sampling from mean: ', mean
         x = np.random.normal(loc = mean[0], scale = mean_scale[0])
         y = np.random.normal(loc = mean[1], scale = mean_scale[1])
         
@@ -122,7 +194,7 @@ class DStreamClusterer():
         self.class_keys = np.array([])
         random.seed(self.seed)
         
-        
+        self.data = np.array([])
 
     def get_density_nmatrix(self, grids):
         
@@ -146,6 +218,10 @@ class DStreamClusterer():
     
     def add_datum(self, datum):
         
+        if self.data.size == 0:
+            self.data = np.array(datum)
+        else:
+            self.data = np.row_stack((self.data, np.array(datum)))
         #print 'current time: ', self.current_time, ' and gap time: ', self.gap_time
         #print 'adding: ', datum
         indices = tuple(self.get_grid_indices(datum))
@@ -159,14 +235,14 @@ class DStreamClusterer():
                 grid = DStreamCharacteristicVector()
         old_density = grid.density                
         grid.density = 1.0 + grid.density*self.decay_factor**(self.current_time - grid.last_update_time)
-        print 'grid at indices {} updated density from {} to {}'.format(indices, old_density, grid.density)
+        #print 'grid at indices {} updated density from {} to {}'.format(indices, old_density, grid.density)
         
         grid.last_update_time = self.current_time
         self.grids[indices] = grid
-        print 'current time: ', self.current_time, ' ', indices, ' added to grids; all count: ', len(self.grids.keys())
+        #print 'current time: ', self.current_time, ' ', indices, ' added to grids; all count: ', len(self.grids.keys())
         
         if self.current_time >= self.gap_time - 1:
-            print '$$$ clusters before: ', self.class_keys
+            print 'clusters before: ', self.class_keys
             
         if self.current_time >= self.gap_time and not self.has_clustered_once:
             print 'initializing clusters'
@@ -379,6 +455,16 @@ class DStreamClusterer():
                 if self.are_neighbors(indices, test_indices) == True:
                     test_grid.label = grid.label
                     self.grids[test_indices] = test_grid
+                    
+        #also see if the one-gridders can merge into a larger neighbor...
+        for indices, grid in one_grid_clusters.items():
+            for class_key in self.class_keys:
+                test_grids = self.get_grids_of_cluster_class(class_key)
+                if len(test_grids.keys()) != 1:
+                    for test_indices, test_grid in test_grids.items():
+                        if self.are_neighbors(indices, test_indices):
+                            grid.label = test_grid.label
+                            self.grids[indices] = grid
                 
     
     def extract_two_clusters_from_grids_having_just_removed_given_grid(self, grids_without_removal, removed_grid):
@@ -729,83 +815,68 @@ class DStreamClusterer():
     
 if __name__ == "__main__":
     
-    np.random.seed(331)
     
-    
-    '''
-    I can/should abstract this mean/scaling stuff to the NMeanSampler2D thing
-    
-    '''
     means_count = 3
+    test_data_size = 800
+    display_times = 100
+    
     x_domain = (0.0, 100.0)
     y_domain = (0.0, 100.0)
+    partitions_per_domain = (5, 5)
+    
 
     means = np.ndarray(shape=(means_count, 2))    
     means_scales = np.ndarray(shape=(means_count, 2))    
     
-    means[0,0] = 0.15#x1, normalized
+    means[0,0] = 0.12#x1, normalized
     means[0,1] = 0.2#y1 
     means_scales[0,0] = 0.05
     means_scales[0,1] = 0.08
         
     
-    means[1,0] = 0.65
-    means[1,1] = 0.25
-    means_scales[1,0] = 0.15
-    means_scales[1,1] = 0.1
+    means[1,0] = 0.61
+    means[1,1] = 0.29
+    means_scales[1,0] = 0.11
+    means_scales[1,1] = 0.07
     
-    means[2,0] = 0.45
-    means[2,1] = 0.55
+    means[2,0] = 0.42
+    means[2,1] = 0.53
     means_scales[2,0] = 0.08
     means_scales[2,1] = 0.13
     
-    means[:, 0] = means[:,0] * (x_domain[1] - x_domain[0])
-    means[:, 1] = means[:,1] * (y_domain[1] - y_domain[0])
-    
-    means_scales[:, 0] = means_scales[:,0] * (x_domain[1] - x_domain[0])
-    means_scales[:, 1] = means_scales[:,1] * (y_domain[1] - y_domain[0])
+
     
     
-    nms2d = NMeanSampler2D(means, means_scales, 331)
-    test_data_size = 100
+    nms2d = NMeanSampler2D(means, means_scales, x_domain, y_domain, 331)
+    
     cluster_test_data = np.ndarray(shape=(test_data_size,2))
     for i in range(test_data_size):
         datum = nms2d.get_sample()
         cluster_test_data[i, :] = datum
         
-    print cluster_test_data
-    raw_input('exit here')    
+    #print cluster_test_data
+    #ClusterDisplay2D.display_ref_data(cluster_test_data, partitions_per_domain)
     
-    for i in range(16):
-        d_stream_clusterer = DStreamClusterer(partitions_per_dimension=(2*i, 2*i))
+    d_stream_clusterer = DStreamClusterer(3.0, 0.8, 0.3, 0.998, 2, (x_domain, y_domain), partitions_per_domain)
+    display_times = d_stream_clusterer.gap_time * 4
     
-    #raw_input('step2')
+    for i in range(test_data_size):
+ 
+        x = cluster_test_data[i, 0]
     
-    npts = 6
-    
-    d_stream_clusterer = DStreamClusterer(partitions_per_dimension=(npts,npts))
-    
-    
-    for i in range(800):
-        '''x = np.random.standard_normal() * 10.0 + 20.0 
-    
-        y = np.random.standard_normal() * 10.0 + 20.0
-        #print 'x, y: ', x, y
-        d_stream_clusterer.add_datum((x, y))'''
-
-                        
-        
-        x = np.random.standard_normal() * 10.0 + 10.0 
-    
-        y = np.random.standard_normal() * 10.0 + 10.0
+        y = cluster_test_data[i, 1]
         
         if x <= 100.0 and x >= 0.0 and y <= 100.0 and y >= 0.0:
             d_stream_clusterer.add_datum((x, y))
         else:
             continue
         
-        
-    den_mat = d_stream_clusterer.get_density_nmatrix(d_stream_clusterer.grids)
+        if np.mod(i, display_times) == 0 and i > 0:
+            ClusterDisplay2D.display_all(d_stream_clusterer.grids, d_stream_clusterer.class_keys, d_stream_clusterer.data, d_stream_clusterer.partitions_per_dimension, d_stream_clusterer.domains_per_dimension)
+    #grids, class_keys, ref_data, partitions_per_dimension, domains_per_dimension):
+    #ClusterDisplay2D.display_all(d_stream_clusterer.grids, d_stream_clusterer.class_keys, cluster_test_data, d_stream_clusterer.partitions_per_dimension, d_stream_clusterer.domains_per_dimension)
+    plt.show()
+    '''den_mat = d_stream_clusterer.get_density_nmatrix(d_stream_clusterer.grids)
     per_cluster_id_den_mat = d_stream_clusterer.get_per_cluster_density_nmatrix_dict()
     
     myColorMap = cm.get_cmap('hot')    
@@ -820,42 +891,5 @@ if __name__ == "__main__":
         im = plt.imshow(class_den_mat, cmap=myColorMap)
         plt.colorbar()
     
-    plt.show()
-    
-    '''print d_stream_clusterer
-    print 'indices for inserting 35.0, 100.0: ', d_stream_clusterer.get_grid_indices((35.0, 100.0))
-    print 'indices for inserting 0.0, 60.0: ', d_stream_clusterer.get_grid_indices((0.0, 60.0))
-    print 'getting dth for t=0, t=4', d_stream_clusterer.density_threshold_function(0, 4)
-    print 'getting dth for t=0, t=8', d_stream_clusterer.density_threshold_function(0, 8)
-    print 'getting dth for t=0, t=16', d_stream_clusterer.density_threshold_function(0, 16)    
-    
-    d_stream_characteristic_vector = DStreamCharacteristicVector ()
-    print d_stream_characteristic_vector
-    
-    test_cart_array = np.array([[0], [2, 3], [4, 5, 6]])
-    print 'test_cart_array: ', test_cart_array
-    test_cart_tuple = tuple(tuple(x) for x in test_cart_array)
-    print 'test_cart_tuple: ', test_cart_tuple
-    test_cart_out = cartesian(test_cart_tuple)
-    print 'test_cart_out: ', test_cart_out
-    
-    
-    
-    G=nx.empty_graph()
-    G.add_edge(1,2)
-    G.add_edge(2,3)
-    G.add_edge(2,4)
-    G.add_edge(4,5)
-    G.add_edge(6,7)
-    
-    print 'path btw 1, 5: '
-    print nx.bidirectional_dijkstra(G,1,5)
-    print 'path btw 7, 5: '
-    try:
-        print nx.bidirectional_dijkstra(G,7,5)
-    except nx.exception.NetworkXNoPath, e:
-        print e
-    
-    fig = plt.figure()
-    nx.draw(G)
     plt.show()'''
+    
