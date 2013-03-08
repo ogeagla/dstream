@@ -270,6 +270,7 @@ class DStreamClusterer():
         #print 'grids after adding: ', self.grids
         
         
+
     def initialize_clusters(self):
         
         
@@ -444,13 +445,71 @@ class DStreamClusterer():
         self.merge_clusters()
         
             
-
+    def create_new_cluster(self, grids):
+        unique_class_key = self.generate_unique_class_key()
+        for indices, grid in grids.items():
+            grid.label = unique_class_key
+            self.grids[indices] = grid
     def merge_clusters(self):  
         
-        ''' do new graph operations here
+        '''
+        graph-based split
         '''        
+        did_split = True
+        while did_split:
+            #print 'did splitting'
+            did_split = False
+            for class_key in self.class_keys:
+                cluster = self.get_grids_of_cluster_class(class_key)
+                cluster_graph = self.get_graph_of_cluster(cluster)
+                if cluster_graph.size() == 0:
+                    print 'null graph, splitting each grid into cluster'
+                    for indices, grid in cluster.items():
+                        self.create_new_cluster({indices:grid})
+                    continue
+                subgraphs = nx.connected_component_subgraphs(cluster_graph)
+                
+                if len(subgraphs) != 1:
+                    did_split = True
+                    print 'SPLIT', cluster.keys(), 'into {} clusters'.format(len(subgraphs))
+                    for subgraph in subgraphs:
+                        nodes = subgraph.nodes()
+                        print 'nodes: ', nodes
+                        new_grids = {}
+                        for node in nodes:
+                            new_grids[node] = self.grids[node]
+                        self.create_new_cluster(new_grids)
+            self.update_class_keys()
+        '''
+        graph-based merge
+        '''
+        did_merge = True
+        while did_merge:
+            #print 'did merging'
+            did_merge = False
+            for class_key in self.class_keys:
+                    cluster = self.get_grids_of_cluster_class(class_key)
+                    if len(cluster.keys()) != 0:
+                        cluster_graph = self.get_graph_of_cluster(cluster)
+                        
+                        for test_class_key in self.class_keys:
+                            if test_class_key != class_key:
+                                test_cluster = self.get_grids_of_cluster_class(test_class_key)
+                                if len(test_cluster.keys()) != 0:
+                                    test_cluster_graph = self.get_graph_of_cluster(test_cluster)
+                                    
+                                    cg_copy = cluster_graph.copy()
+                                    cg_copy.add_edges_from(test_cluster_graph.edges())
+                                    subgraphs = nx.connected_component_subgraphs(cg_copy)
+                                    if(len(subgraphs) == 1):
+                                        did_merge = True
+                                        print 'MERGE', cluster.keys(), test_cluster.keys()
+                                        if len(cluster.keys()) > len(test_cluster.keys()):
+                                            self.assign_to_cluster_class(test_cluster, class_key)
+                                        else:
+                                            self.assign_to_cluster_class(cluster, class_key)
         
-        
+        '''
         #merge clusters of size 1
         one_grid_clusters = {}
         for class_key in self.class_keys:
@@ -476,7 +535,7 @@ class DStreamClusterer():
                     for test_indices, test_grid in test_grids.items():
                         if self.are_neighbors(indices, test_indices):
                             grid.label = test_grid.label
-                            self.grids[indices] = grid
+                            self.grids[indices] = grid'''
         self.update_class_keys()
         
     def extract_two_clusters_from_grids_having_just_removed_given_grid(self, grids_without_removal, removed_grid):
@@ -681,7 +740,7 @@ class DStreamClusterer():
         for indices, grid in grids.items():
             if grid.label != class_key:
                 grid.label_changed_last_iteration = True
-                print grid.label, class_key
+                #print grid.label, class_key
             grid.label = class_key
             
             self.grids[indices] = grid
