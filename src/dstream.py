@@ -447,39 +447,66 @@ class DStreamClusterer():
             
     def create_new_cluster(self, grids):
         unique_class_key = self.generate_unique_class_key()
+        #print 'creating new cluster with key: ', unique_class_key, ', uniqueness : ', not unique_class_key in self.class_keys
         for indices, grid in grids.items():
+            #print 'grid goes from {} to {}'.format(grid.label, unique_class_key)
             grid.label = unique_class_key
             self.grids[indices] = grid
+        
     def merge_clusters(self):  
         
+        
+        '''print 'all graph'
+        all_graph = self.get_graph_of_cluster(self.grids)
+        fig = plt.figure()
+        nx.draw(all_graph)
+        plt.show()'''
+        ClusterDisplay2D.display_all(self.grids, self.class_keys, self.data, self.partitions_per_dimension, self.domains_per_dimension, 'in merge', False)
         '''
         graph-based split
         '''        
-        did_split = True
-        while did_split:
-            #print 'did splitting'
-            did_split = False
-            for class_key in self.class_keys:
-                cluster = self.get_grids_of_cluster_class(class_key)
-                cluster_graph = self.get_graph_of_cluster(cluster)
-                if cluster_graph.size() == 0:
-                    print 'null graph, splitting each grid into cluster'
-                    for indices, grid in cluster.items():
-                        self.create_new_cluster({indices:grid})
-                    continue
-                subgraphs = nx.connected_component_subgraphs(cluster_graph)
+        
+        for class_key in self.class_keys:
+            if class_key == None or class_key == '' or class_key == []:
+                #print class_key, ' is no good class key'
+                continue
+            #print 'attemping split of class {}'.format(class_key)
+            cluster = self.get_grids_of_cluster_class(class_key)
+            cluster_graph = self.get_graph_of_cluster(cluster)
+            #print 'cluster graph size {}'.format(len(cluster_graph.nodes()))
+            
+            if len(cluster_graph.nodes()) == 0:
+                for indices, grid in cluster.items():
+                    print indices, grid.label
+                #print 'null graph, splitting each grid into cluster'
+                #raw_input()
+                for indices, grid in cluster.items():
+                    self.create_new_cluster({indices:grid})
+                continue
+            subgraphs = nx.connected_component_subgraphs(cluster_graph)
+            if len(subgraphs) != 1:
                 
-                if len(subgraphs) != 1:
-                    did_split = True
-                    print 'SPLIT', cluster.keys(), 'into {} clusters'.format(len(subgraphs))
-                    for subgraph in subgraphs:
-                        nodes = subgraph.nodes()
-                        print 'nodes: ', nodes
-                        new_grids = {}
-                        for node in nodes:
-                            new_grids[node] = self.grids[node]
-                        self.create_new_cluster(new_grids)
-            self.update_class_keys()
+                '''print 'SPLIT', cluster.keys(), 'into {} clusters'.format(len(subgraphs))
+                print 'subgraph count: ', len(subgraphs)
+                print 'class keys before: ', self.class_keys.size, self.class_keys'''
+                '''fig = plt.figure()
+                nx.draw(cluster_graph)
+                plt.show()'''
+                for subgraph in subgraphs:
+                    nodes = subgraph.nodes()
+                    #print 'nodes: ', nodes
+                    new_grids = {}
+                    for node in nodes:
+                        new_grids[node] = self.grids[node]
+                    self.create_new_cluster(new_grids)
+                #print 'class keys after: ', self.class_keys.size, self.class_keys
+                self.update_class_keys()
+                self.merge_clusters()
+                    
+            #else:
+                #print 'subgraphs size one'
+            
+       
         '''
         graph-based merge
         '''
@@ -488,10 +515,11 @@ class DStreamClusterer():
             #print 'did merging'
             did_merge = False
             for class_key in self.class_keys:
+                    #print 'attempting merge of cluster class ', class_key
                     cluster = self.get_grids_of_cluster_class(class_key)
                     if len(cluster.keys()) != 0:
                         cluster_graph = self.get_graph_of_cluster(cluster)
-                        
+                        #print 'cluster graph size ', len(cluster_graph.nodes())
                         for test_class_key in self.class_keys:
                             if test_class_key != class_key:
                                 test_cluster = self.get_grids_of_cluster_class(test_class_key)
@@ -499,11 +527,33 @@ class DStreamClusterer():
                                     test_cluster_graph = self.get_graph_of_cluster(test_cluster)
                                     
                                     cg_copy = cluster_graph.copy()
+                                    #print 'adding {} of size {} to {} of size {}'.format(test_cluster_graph.nodes(), len(test_cluster_graph.nodes()), cg_copy.nodes(), len(cg_copy.nodes()))
                                     cg_copy.add_edges_from(test_cluster_graph.edges())
+
+                                    for node in cg_copy.nodes():
+                                        
+                                        for test_node in cg_copy.nodes():
+                                            if test_node != node:
+                                                if self.are_neighbors(node, test_node):
+                                                    if cg_copy.has_edge(node, test_node) == False:
+                                                        #print 'adding edge ', (node, test_node)
+                                                        cg_copy.add_edge(node, test_node)
+                                    
                                     subgraphs = nx.connected_component_subgraphs(cg_copy)
+                                    #print 'results has {} subgraphs'.format(len(subgraphs))
+                                   
+                                    '''for subgraph in subgraphs:
+                                        fig = plt.figure()
+                                        nx.draw(subgraph)
+                                    plt.show()'''
                                     if(len(subgraphs) == 1):
                                         did_merge = True
-                                        print 'MERGE', cluster.keys(), test_cluster.keys()
+                                        #print 'MERGE', cluster.keys(), test_cluster.keys()
+                                        #print type(subgraphs), len(subgraphs), subgraphs
+                                        '''fig = plt.figure()
+                                        nx.draw(subgraphs[0])                                        
+                                        #nx.draw(self.get_graph_of_cluster(dict(cluster.items() + test_cluster.items())))
+                                        plt.show()'''
                                         if len(cluster.keys()) > len(test_cluster.keys()):
                                             self.assign_to_cluster_class(test_cluster, class_key)
                                         else:
@@ -590,10 +640,16 @@ class DStreamClusterer():
                     #print '***** ', indices, other_indices, ' ARE neighbors'
                     if g.has_edge(indices, other_indices) == False:
                         g.add_edge(indices, other_indices)
-                else:
-                    pass#print indices, other_indices, ' are not neighbors'
-        if len(indices_list) == 1:
-            g.add_node(indices_list[0])
+                        continue
+                g.add_node(other_indices)
+            if g.has_node(indices) == False:
+                g.add_node(indices)
+            
+            
+        
+        #print 'g size {}'.format(g.size())
+        
+        
         return g
         
     def are_neighbors(self, grid1_indices, grid2_indices):
