@@ -15,10 +15,9 @@ there are many other places where I can/should substitute my algs with the new N
 TODO:
     -instead of sampling by always producing a new sample from a random of N pdfs, better sample everything offline, add noise and then sample by randomly selecting from the array of already-sampled and noise.
         -along those lines, also extend the above idea to support time-dep pdf sampling weights    
-    -better merge of current clusters
-        -*this can be done by combinig their graphs and then getting all proper subgraphs; if there are more than 1, you cant merge them! simple
+
     -validate/check for 'None's in grid.label and grid.status.  they should NOT appear after a call to cluster.
-    -current params are good, analyze this setup and see why it "doesnt"(?) work well
+    
     
 '''
 
@@ -93,7 +92,7 @@ class ClusterDisplay2D():
 
 class NMeanSampler2D():
     
-    def __init__(self, means, means_scales, x_domain, y_domain, seed):
+    def __init__(self, means, means_scales, x_domain, y_domain, seed, means_sample_times=None, noise_coeff = 0.0):
         
         means[:, 0] = means[:,0] * (x_domain[1] - x_domain[0])
         means[:, 1] = means[:,1] * (y_domain[1] - y_domain[0])
@@ -103,13 +102,28 @@ class NMeanSampler2D():
         
         self.means = means
         self.means_scales = means_scales
+        self.domains = (x_domain, y_domain)
         #print means.shape, means_scales.shape
         self.seed = seed
         np.random.seed(seed)
+        
+        if means_sample_times != None:
+            
+            self.means_sample_times = means_sample_times
+            self.noise_coeff = noise_coeff
+            
+            self.current_mean_index = 0
+            self.current_mean_count = 0
+        
     
-    def get_sample(self):
+    def get_random_mean_index(self):
         rand_uni = np.random.uniform()
         mean_index = np.int(np.floor(rand_uni * self.means.shape[0]))
+        return mean_index
+    
+    def get_sample(self):
+        
+        mean_index = self.get_random_mean_index()
         
         mean = self.means[mean_index, :]
         mean_scale = self.means_scales[mean_index, :]
@@ -118,6 +132,40 @@ class NMeanSampler2D():
         y = np.random.normal(loc = mean[1], scale = mean_scale[1])
         
         return np.array([x, y])
+        
+    def get_noisy_time_dep_sample(self):
+        
+        rand_uni = np.random.uniform()
+        
+        if rand_uni <= self.noise_coeff:
+            x, y = np.random.uniform()*(self.domains[0][1]-self.domains[0][0]), np.random.uniform()*(self.domains[1][1]-self.domains[1][0])
+            #print 'noise ', x, y       
+            return np.array([x, y])
+        
+            
+        if self.current_mean_count >= self.means_sample_times[self.current_mean_index]:
+            '''print 'means sample count ', self.means_sample_times
+            print 'rotating means ', self.current_mean_count, self.current_mean_index
+            print 'now: ', self.means, self.means_scales'''
+            if self.current_mean_index == self.means_sample_times.size - 1:
+                self.current_mean_index = 0
+            else:
+                self.current_mean_index += 1
+            #print 'now ', self.current_mean_index
+            self.current_mean_count = 0
+        
+        mean = self.means[self.current_mean_index, :]
+        mean_scale = self.means_scales[self.current_mean_index, :]
+        
+        x = np.random.normal(loc = mean[0], scale = mean_scale[0])
+        y = np.random.normal(loc = mean[1], scale = mean_scale[1])
+                
+        self.current_mean_count += 1
+        #print x, y, ' about ', mean, mean_scale
+        return np.array([x, y])
+        
+        
+    
         
           
 
@@ -921,7 +969,7 @@ if __name__ == "__main__":
     
     
     means_count = 3
-    test_data_size = 80000
+    test_data_size = 2000
     display_times = 1
     
     x_domain = (0.0, 100.0)
@@ -951,24 +999,34 @@ if __name__ == "__main__":
 
     
     
-    nms2d = NMeanSampler2D(means, means_scales, x_domain, y_domain, 331)
-    
-    cluster_test_data = np.ndarray(shape=(test_data_size,2))
+    #nms2d = NMeanSampler2D(means, means_scales, x_domain, y_domain, 331)
+    nms2d_exp = NMeanSampler2D(means, means_scales, x_domain, y_domain, 331, np.array([25, 50, 25]), 0.15)
+    #cluster_test_data = np.ndarray(shape=(test_data_size,2))
+    cluster_test_data_exp = np.ndarray(shape=(test_data_size,2))
+        
     for i in range(test_data_size):
-        datum = nms2d.get_sample()
-        cluster_test_data[i, :] = datum
+        #datum = nms2d.get_sample()
+        #cluster_test_data[i, :] = datum
+        
+        datum_exp = nms2d_exp.get_noisy_time_dep_sample()
+        cluster_test_data_exp[i, :] = datum_exp
         
     #print cluster_test_data
-    #ClusterDisplay2D.display_ref_data(cluster_test_data, partitions_per_domain)
+    #ClusterDisplay2D.display_ref_data(cluster_test_data, par/tions_per_domain)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    scat = ax.scatter(cluster_test_data_exp[:, 0], cluster_test_data_exp[:, 1])
+    plt.show()
     
+
     d_stream_clusterer = DStreamClusterer(3.0, 0.8, 0.3, 0.998, 2, (x_domain, y_domain), partitions_per_domain)
     display_times = test_data_size/5#d_stream_clusterer.gap_time * 1000
     
     for i in range(test_data_size):
  
-        x = cluster_test_data[i, 0]
+        x = cluster_test_data_exp[i, 0]
     
-        y = cluster_test_data[i, 1]
+        y = cluster_test_data_exp[i, 1]
         
         if x <= 100.0 and x >= 0.0 and y <= 100.0 and y >= 0.0:
             d_stream_clusterer.add_datum((x, y))
