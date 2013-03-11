@@ -473,8 +473,8 @@ class DStreamClusterer():
             subgraphs = nx.connected_component_subgraphs(cluster_graph)
             if len(subgraphs) != 1:
                 
-                '''print 'SPLIT', cluster.keys(), 'into {} clusters'.format(len(subgraphs))
-                print 'subgraph count: ', len(subgraphs)
+                print 'SPLIT', cluster.keys(), 'into {} clusters'.format(len(subgraphs))
+                '''print 'subgraph count: ', len(subgraphs)
                 print 'class keys before: ', self.class_keys.size, self.class_keys'''
                 '''fig = plt.figure()
                 nx.draw(cluster_graph)
@@ -541,18 +541,18 @@ class DStreamClusterer():
                                     nx.draw(subgraphs[0])                                        
                                     #nx.draw(self.get_graph_of_cluster(dict(cluster.items() + test_cluster.items())))
                                     plt.show()'''
-                                    print 'before ', len(self.class_keys)
+                                    #print 'before ', len(self.class_keys)
                                     if len(cluster.keys()) > len(test_cluster.keys()):
                                         self.assign_to_cluster_class(test_cluster, class_key)
                                     else:
                                         self.assign_to_cluster_class(cluster, test_class_key)
                                     self.update_class_keys() 
-                                    print 'after ', len(self.class_keys)
+                                    #print 'after ', len(self.class_keys)
                                     self.merge()
                 
     def split_and_merge(self):  
         
-        print 'merging'
+        #print 'merging'
         '''print 'all graph'
         all_graph = self.get_graph_of_cluster(self.grids)
         fig = plt.figure()
@@ -565,42 +565,13 @@ class DStreamClusterer():
         self.split()
         
             
-       
         '''
         graph-based merge
         '''
         
         self.merge()
         
-                        
         
-        '''
-        #merge clusters of size 1
-        one_grid_clusters = {}
-        for class_key in self.class_keys:
-            grids = self.get_grids_of_cluster_class(class_key)
-            if len(grids.keys()) == 1:
-                for indices, grid in grids.items():
-                    one_grid_clusters[indices] = grid
-        self.update_class_keys()
-        #this is such a poor method, it hurts:
-        for indices, grid in one_grid_clusters.items():
-            
-            for test_indices, test_grid in one_grid_clusters.items():
-                
-                if self.are_neighbors(indices, test_indices) == True:
-                    test_grid.label = grid.label
-                    self.grids[test_indices] = test_grid
-        self.update_class_keys()            
-        #also see if the one-gridders can merge into a larger neighbor...
-        for indices, grid in one_grid_clusters.items():
-            for class_key in self.class_keys:
-                test_grids = self.get_grids_of_cluster_class(class_key)
-                if len(test_grids.keys()) != 1:
-                    for test_indices, test_grid in test_grids.items():
-                        if self.are_neighbors(indices, test_indices):
-                            grid.label = test_grid.label
-                            self.grids[indices] = grid'''
         self.update_class_keys()
         
     def extract_two_clusters_from_grids_having_just_removed_given_grid(self, grids_without_removal, removed_grid):
@@ -950,7 +921,7 @@ if __name__ == "__main__":
     
     
     means_count = 3
-    test_data_size = 8000
+    test_data_size = 80000
     display_times = 1
     
     x_domain = (0.0, 100.0)
