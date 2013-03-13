@@ -9,6 +9,7 @@ import matplotlib.cm as cm
 import copy
 
 
+
 '''
 there are many other places where I can/should substitute my algs with the new NetworkX version using graphs
 
@@ -25,7 +26,7 @@ class ClusterDisplay2D():
 
 
     @staticmethod
-    def display_all(grids, class_keys, ref_data, partitions_per_dimension, domains_per_dimension, plot_name='dstream', save=False):
+    def display_all(grids, class_keys, ref_data, partitions_per_dimension, domains_per_dimension, plot_name='dstream', save=False, plot_count=None):
         class_key_colors = {}
         color_map = cm.get_cmap('hsv') 
         for i in range(class_keys.size):
@@ -44,7 +45,11 @@ class ClusterDisplay2D():
         
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        ax.set_title(plot_name)
+        if plot_count is not None:
+            plot_info = '_' +str(plot_count[0]).zfill(len(str(plot_count[1])))+ '_of_' + str(plot_count[1]) + '_t=' + str(ref_data[:,0].size)
+        else:
+            plot_info = '_t=' + str(ref_data[:,0].size)
+        ax.set_title(plot_name+ plot_info)
         #print x_domain, y_domain, x_domain_size, y_domain_size, x_partitions, y_partitions
         x_ticks = np.arange(x_domain[0], x_domain[1]+ x_domain[1]/1000.0, x_cluster_width)
         y_ticks = np.arange(y_domain[0], y_domain[1] + y_domain[1]/1000.0 , y_cluster_width)
@@ -86,7 +91,7 @@ class ClusterDisplay2D():
             
             ax.scatter(x, y, marker = mark, c = class_color, s=grid.density*10, linewidths = 0.1,label= ' ' + str(class_key))
         if save:
-            plt.savefig('../figs/dstream' + '_' + plot_name + '_' + str(ref_data[:,0].size) + '.png', bbox_inches = 0)
+            plt.savefig('../figs/dstream' + '_' + plot_name + plot_info + '.png', bbox_inches = 0)
             #plt.savefig(filename + '.pdf', bbox_inches = 0)
         #leg = ax.legend(loc=2)
 
@@ -205,7 +210,7 @@ class DStreamClusterer():
                  dimensions = 2, 
                  domains_per_dimension = ((0.0, 100.0), (0.0, 100.0)),
                  partitions_per_dimension = (5, 5)):
-        print 'provdied: ', dense_threshold_parameter, sparse_threshold_parameter, sporadic_threshold_parameter, decay_factor, dimensions, domains_per_dimension, partitions_per_dimension
+        print 'provided: ', dense_threshold_parameter, sparse_threshold_parameter, sporadic_threshold_parameter, decay_factor, dimensions, domains_per_dimension, partitions_per_dimension
         self.dense_threshold_parameter = dense_threshold_parameter
         self.sparse_thresold_parameter = sparse_threshold_parameter
         self.sporadic_threshold_parameter = sporadic_threshold_parameter
@@ -404,7 +409,7 @@ class DStreamClusterer():
             last_label_changed_grids = self.get_last_label_changed()
             diff  = np.setdiff1d(np.array(last_label_changed_grids.keys()), np.array(last_label_changed_grids_2.keys()))
         self.has_clustered_once = True
-        #ClusterDisplay2D.display_all(self.grids, self.class_keys, self.data, self.partitions_per_dimension, self.domains_per_dimension, 'after cluster initialization', True)
+        ClusterDisplay2D.display_all(self.grids, self.class_keys, self.data, self.partitions_per_dimension, self.domains_per_dimension, 'after cluster initialization', True)
     def cluster(self):
         self.update_density_category()
         for indices, grid in self.get_most_recently_categorically_changed_grids().items():
@@ -651,6 +656,8 @@ class DStreamClusterer():
         removal_grid_indices = removal_grid[0]
         #print 'removal grid indices: ', removal_grid_indices
         grids_with_removal = {key: value for key, value in grids_without_removal.items() if key is not removal_grid_indices}
+
+
         #print 'connect grids with removal keys: ', grids_with_removal.keys()
         
         graph_with_removal = self.get_graph_of_cluster(grids_with_removal)
@@ -964,12 +971,24 @@ class DStreamClusterer():
         top = self.sparse_thresold_parameter * (1.0 - self.decay_factor ** (current_time - last_update_time + 1))
         bottom = self.maximum_grid_count * (1.0 - self.decay_factor)
         return top/bottom
+
+def pngs_to_gif(pngs_str, gif_str, delay=100):
+    '''
+    this doesnt work for some reason...equivalent cmd works in cl
+    
+    '''
+    import subprocess
+    
+    params = []
+    params += ["-delay", str(delay)]
+    print 'calling ',["convert"] + params + [pngs_str,gif_str]
+   
+    subprocess.call(["convert"] + params + [pngs_str,gif_str], shell=True)    
     
 if __name__ == "__main__":
     
-    
     means_count = 3
-    test_data_size = 2000
+    test_data_size = 20000
     display_times = 1
     
     x_domain = (0.0, 100.0)
@@ -996,11 +1015,9 @@ if __name__ == "__main__":
     means_scales[2,0] = 0.06
     means_scales[2,1] = 0.05
     
-
-    
     
     #nms2d = NMeanSampler2D(means, means_scales, x_domain, y_domain, 331)
-    nms2d_exp = NMeanSampler2D(means, means_scales, x_domain, y_domain, 331, np.array([25, 50, 25]), 0.15)
+    nms2d_exp = NMeanSampler2D(means, means_scales, x_domain, y_domain, 331, np.array([test_data_size/6., test_data_size/6., test_data_size/6.]), 0.15)
     #cluster_test_data = np.ndarray(shape=(test_data_size,2))
     cluster_test_data_exp = np.ndarray(shape=(test_data_size,2))
         
@@ -1020,8 +1037,11 @@ if __name__ == "__main__":
     
 
     d_stream_clusterer = DStreamClusterer(3.0, 0.8, 0.3, 0.998, 2, (x_domain, y_domain), partitions_per_domain)
-    display_times = test_data_size/5#d_stream_clusterer.gap_time * 1000
     
+    
+    plot_count = 1
+    total_plots = 24
+    display_times = test_data_size/total_plots#d_stream_clusterer.gap_time * 1000
     for i in range(test_data_size):
  
         x = cluster_test_data_exp[i, 0]
@@ -1034,12 +1054,18 @@ if __name__ == "__main__":
             continue
         
         if np.mod(i, display_times) == 0 and i > 0:
-            ClusterDisplay2D.display_all(d_stream_clusterer.grids, d_stream_clusterer.class_keys, d_stream_clusterer.data, d_stream_clusterer.partitions_per_dimension, d_stream_clusterer.domains_per_dimension)
+            ClusterDisplay2D.display_all(d_stream_clusterer.grids, d_stream_clusterer.class_keys, d_stream_clusterer.data, d_stream_clusterer.partitions_per_dimension, d_stream_clusterer.domains_per_dimension, 'streaming', True, (plot_count, total_plots))
             print i, '/', test_data_size
+            plot_count += 1
     ClusterDisplay2D.display_all(d_stream_clusterer.grids, d_stream_clusterer.class_keys, d_stream_clusterer.data, d_stream_clusterer.partitions_per_dimension, d_stream_clusterer.domains_per_dimension, 'final clusters', True)
+    subprocess.call(["convert", "-delay", "100", "figs/anim/*.png", "figs/anim/anim.gif"])
+    '''plt.show()'''
+    
+    
+    
     #grids, class_keys, ref_data, partitions_per_dimension, domains_per_dimension):
     #ClusterDisplay2D.display_all(d_stream_clusterer.grids, d_stream_clusterer.class_keys, cluster_test_data, d_stream_clusterer.partitions_per_dimension, d_stream_clusterer.domains_per_dimension)
-    plt.show()
+    
     '''den_mat = d_stream_clusterer.get_density_nmatrix(d_stream_clusterer.grids)
     per_cluster_id_den_mat = d_stream_clusterer.get_per_cluster_density_nmatrix_dict()
     
