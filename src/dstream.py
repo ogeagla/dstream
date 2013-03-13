@@ -417,26 +417,28 @@ class DStreamClusterer():
                                 
             neighboring_grids = self.get_neighboring_grids(indices)
             neighboring_clusters = {}
-            for neighbor_indices, neighbor_grid in neighboring_grids.items():
-                neighbors_cluster_class = neighbor_grid.label
-                neighbors_cluster_grids = self.get_grids_of_cluster_class(neighbors_cluster_class)
-                neighboring_clusters[neighbor_indices, neighbors_cluster_class] =  neighbors_cluster_grids
-            if len(neighboring_grids.keys()) != 0:
-                max_neighbor_cluster_size = 0
-                max_size_indices = None
-                #max_size_cluster = None
-                #print 'neighboring clusters: ', neighboring_clusters.keys()
-                for k, ref_neighbor_cluster_grids in neighboring_clusters.items():
-                    test_size = len(ref_neighbor_cluster_grids.keys())
-                    #print 'size comparison: ', test_size, max_neighbor_cluster_size
-                    if test_size > max_neighbor_cluster_size:
-                        max_neighbor_cluster_size = test_size
-                        #max_size_cluster = neighbor_cluster
-                        max_size_cluster_key = k[1]
-                        max_size_indices = k[0]
-                        max_cluster_grids = ref_neighbor_cluster_grids
-                max_size_grid = neighboring_grids[max_size_indices]
-                grids_cluster = self.get_grids_of_cluster_class(grid.label)                    
+            if neighboring_grids != None:            
+                
+                for neighbor_indices, neighbor_grid in neighboring_grids.items():
+                    neighbors_cluster_class = neighbor_grid.label
+                    neighbors_cluster_grids = self.get_grids_of_cluster_class(neighbors_cluster_class)
+                    neighboring_clusters[neighbor_indices, neighbors_cluster_class] =  neighbors_cluster_grids
+                if len(neighboring_grids.keys()) != 0:
+                    max_neighbor_cluster_size = 0
+                    max_size_indices = None
+                    #max_size_cluster = None
+                    #print 'neighboring clusters: ', neighboring_clusters.keys()
+                    for k, ref_neighbor_cluster_grids in neighboring_clusters.items():
+                        test_size = len(ref_neighbor_cluster_grids.keys())
+                        #print 'size comparison: ', test_size, max_neighbor_cluster_size
+                        if test_size > max_neighbor_cluster_size:
+                            max_neighbor_cluster_size = test_size
+                            #max_size_cluster = neighbor_cluster
+                            max_size_cluster_key = k[1]
+                            max_size_indices = k[0]
+                            max_cluster_grids = ref_neighbor_cluster_grids
+                    max_size_grid = neighboring_grids[max_size_indices]
+                    grids_cluster = self.get_grids_of_cluster_class(grid.label)                    
                                 
             
             if grid.density_category == 'SPARSE':
@@ -746,6 +748,7 @@ class DStreamClusterer():
         return False
         
     def grid_is_outside_if_added_to_cluster(self, test_grid, grids):
+        grids = grids.copy()
         grids[test_grid[0]] = test_grid[1] 
         inside_grids, outside_grids = self.get_inside_grids(grids)
         if outside_grids.has_key(test_grid[0]):
@@ -758,17 +761,39 @@ class DStreamClusterer():
         target_inside_neighbor_count = 2 * self.dimensions
         for indices, grid in grids.items():
             neighboring_grids = self.get_neighboring_grids(indices, grids)
-            if len(neighboring_grids.keys()) == target_inside_neighbor_count:
-                inside_grids[indices] = grid
-            else:
-                outside_grids[indices] = grid
+            if neighboring_grids != None:
+                if len(neighboring_grids.keys()) == target_inside_neighbor_count:
+                    inside_grids[indices] = grid
+                else:
+                    outside_grids[indices] = grid
+            
                 
         return inside_grids, outside_grids
 
     def get_neighboring_grids(self, ref_indices, cluster_grids = None):
         '''
         there is obvious room for optimization here using nicer data structures (BFS tree), right now will just test naive approach 
+            -update: should implemnt this using a graph of all the edges. then can take a node and get all edges to get neighboring nodes and viola
         '''    
+        
+        to_get_neighbors_amongst = {}
+        
+        if cluster_grids != None:
+            to_get_neighbors_amongst = cluster_grids
+        else:
+            to_get_neighbors_amongst = self.grids
+        to_get_neighbors_amongst[ref_indices] = self.grids[ref_indices]
+        to_get_neighbors_amongst_graph = self.get_graph_of_cluster(to_get_neighbors_amongst)
+        neighbors = to_get_neighbors_amongst_graph.neighbors(ref_indices)
+        neighbors_dict = {}
+        for i in range(len(neighbors)):
+            indices = neighbors[i]
+            neighbors_dict[indices] = self.grids[indices]
+        if len(neighbors_dict) == 0:
+            return None
+        return neighbors_dict
+        
+        '''
         neighbors = {}
         #print 'ref indices: ', ref_indices
         
@@ -822,7 +847,7 @@ class DStreamClusterer():
                     grid = self.grids[indices]
                     neighbors[indices] = grid
         #print 'neighbors keys: ', neighbors.keys()
-        return neighbors
+        return neighbors'''
     def get_last_label_changed(self):
         grids = {}
         for indices, grid in self.grids.items():
