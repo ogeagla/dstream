@@ -1,8 +1,16 @@
 # -*- coding: utf-8 -*-
 '''import sys
 sys.path.append('libs/networkx-1.7-py2.7.egg')'''
+
 import numpy as np
 import random
+
+
+
+'''
+Note: networkx is required. the easiest way to acquire the module is to either use my provided egg in ../lib 
+or go to NetworkX's site and get it and do something like su -c 'easy_install *.egg' or sudo something if you're into that sorta thing
+'''
 import networkx as nx
 
 
