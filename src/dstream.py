@@ -18,9 +18,7 @@ import networkx as nx
 '''
 there are many other places where I can/should substitute my algs with the new NetworkX version using graphs
 
-TODO:
-    -instead of sampling by always producing a new sample from a random of N pdfs, better sample everything offline, add noise and then sample by randomly selecting from the array of already-sampled and noise.
-        -along those lines, also extend the above idea to support time-dep pdf sampling weights    
+TODO: 
 
     -validate/check for 'None's in grid.label and grid.status.  they should NOT appear after a call to cluster.
     
@@ -62,7 +60,9 @@ class DStreamClusterer():
                  decay_factor = 0.998,#0.998, #lambda
                  dimensions = 2, 
                  domains_per_dimension = ((0.0, 100.0), (0.0, 100.0)),
-                 partitions_per_dimension = (5, 5)):
+                 partitions_per_dimension = (5, 5),
+                 initial_cluster_count = 4,
+                 seed = 331):
         print 'provided: ', dense_threshold_parameter, sparse_threshold_parameter, sporadic_threshold_parameter, decay_factor, dimensions, domains_per_dimension, partitions_per_dimension
         self.dense_threshold_parameter = dense_threshold_parameter
         self.sparse_thresold_parameter = sparse_threshold_parameter
@@ -82,7 +82,7 @@ class DStreamClusterer():
         self.grids = {}
         self.removed_grid_cache = {}
         #self.clusters = np.array([], dtype=type(DStreamCluster))
-        self.cluster_count = 3 #from ref        
+        self.cluster_count = initial_cluster_count     
         
         self.gap_time = -1.0
         self.compute_gap_time()
@@ -91,7 +91,7 @@ class DStreamClusterer():
         self.current_time = 0
         #self.last_updated_grids = {}
         
-        seed = 331
+        
         self.seed = seed        
         self.class_keys = np.array([])
         random.seed(self.seed)
