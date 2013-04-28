@@ -428,9 +428,9 @@ class DStreamClusterer():
                                         if test_node != node:
                                             if self.are_neighbors(node, test_node):
                                                 if cg_copy.has_edge(node, test_node) == False:
-                                                   # print 'adding edge ', (node, test_node)
+                                                    # print 'adding edge ', (node, test_node)
                                                     cg_copy.add_edge(node, test_node)
-                                
+
                                 subgraphs = nx.connected_component_subgraphs(cg_copy)
                                 #print 'results has {} subgraphs'.format(len(subgraphs))
                                
@@ -835,8 +835,9 @@ class DStreamClusterer():
             
             domain_tuple = self.domains_per_dimension[i]
             partitions = self.partitions_per_dimension[i]
-            
-            index = np.floor([(datum[i]/domain_tuple[1])*(partitions)])[0]
+            domain_size = domain_tuple[1] - domain_tuple[0]
+            test_datum = datum[i] - domain_tuple[0]
+            index = np.floor([(test_datum/domain_size)*(partitions)])[0]
             if index >= partitions:
                 print 'index equals partitions: ', index, partitions
                 index = partitions - 1
